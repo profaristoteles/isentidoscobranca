@@ -371,6 +371,26 @@ app.post('/api/whatsapp/webhook', (req, res) => {
   res.json({ success: true });
 });
 
+// Clean database for production (keep regras, crmConfig, and polos)
+app.post('/api/clear-db', (req, res) => {
+  const db = readDB();
+  db.alunos = [];
+  db.boletos = [];
+  db.mensagens = [];
+  db.logs = [
+    {
+      id: `log-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      tipo: 'USUARIO',
+      usuario: 'Sistema',
+      detalhe: 'Banco de dados limpo para início de produção com dados reais.',
+      sucesso: true
+    }
+  ];
+  writeDB(db);
+  res.json({ success: true, message: 'Banco de dados limpo com sucesso para produção!', data: db });
+});
+
 
 
 // Serve React frontend static files in production

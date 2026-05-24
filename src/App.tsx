@@ -734,6 +734,57 @@ export default function App() {
     }
   };
 
+  // Operation 7.5: Clear Database for Production (wipe students, bills, logs, messages)
+  const handleClearDatabase = async () => {
+    try {
+      const response = await fetch('/api/clear-db', { method: 'POST' });
+      if (response.ok) {
+        const result = await response.json();
+        // Hydrate empty state
+        skipSyncRef.current = true;
+        setAlunos([]);
+        setBoletos([]);
+        setMensagens([]);
+        if (result.data && result.data.logs) {
+          setLogs(result.data.logs);
+        }
+        
+        // Clean localStorage items
+        localStorage.removeItem('sentidos_alunos');
+        localStorage.removeItem('sentidos_boletos');
+        localStorage.removeItem('sentidos_mensagens');
+        localStorage.removeItem('sentidos_logs');
+        
+        postToastAlert('Banco de dados limpo para produção com sucesso! Modelos de réguas e chaves de API foram preservados.', 'success');
+      } else {
+        postToastAlert('O servidor respondeu com erro ao limpar o banco de dados.', 'error');
+      }
+    } catch (err) {
+      // Offline fallback: wipe local storage
+      localStorage.removeItem('sentidos_alunos');
+      localStorage.removeItem('sentidos_boletos');
+      localStorage.removeItem('sentidos_mensagens');
+      localStorage.removeItem('sentidos_logs');
+
+      skipSyncRef.current = true;
+      setAlunos([]);
+      setBoletos([]);
+      setMensagens([]);
+      setLogs([
+        {
+          id: `log-${Date.now()}`,
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          tipo: 'USUARIO',
+          usuario: 'Sistema',
+          detalhe: 'Banco de dados local limpo para início de produção com dados reais.',
+          sucesso: true
+        }
+      ]);
+
+      postToastAlert('Banco offline (localStorage) limpo para produção!', 'success');
+    }
+  };
+
   // Operation 8: Delete student and their dependencies safely
   const handleDeleteAluno = (alunoId: string) => {
     const studentObj = alunos.find(a => a.id === alunoId);
@@ -875,6 +926,7 @@ export default function App() {
             <ConfiguracoesView 
               onPostAlert={postToastAlert} 
               onResetDatabase={handleResetDatabase}
+              onClearDatabase={handleClearDatabase}
               polos={polos}
               onUpdatePolos={setPolos}
               alunos={alunos}

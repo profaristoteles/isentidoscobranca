@@ -29,6 +29,7 @@ import { checkConnectionStatus } from '../services/whatsappService';
 interface ConfiguracoesViewProps {
   onPostAlert: (msg: string, type: 'success' | 'warning' | 'error') => void;
   onResetDatabase: () => void;
+  onClearDatabase: () => void;
   polos: string[];
   onUpdatePolos: (newPolos: string[]) => void;
   alunos: Aluno[];
@@ -42,7 +43,7 @@ interface MockUser {
   active: boolean;
 }
 
-export default function ConfiguracoesView({ onPostAlert, onResetDatabase, polos, onUpdatePolos, alunos }: ConfiguracoesViewProps) {
+export default function ConfiguracoesView({ onPostAlert, onResetDatabase, onClearDatabase, polos, onUpdatePolos, alunos }: ConfiguracoesViewProps) {
   // Users list State
   const [users, setUsers] = useState<MockUser[]>([
     { id: 'usr-1', name: 'Ana Carolina Meireles', email: 'secretaria.sentidos@sentidos.edu.br', role: 'Secretaria', active: true },
@@ -498,6 +499,30 @@ export default function ConfiguracoesView({ onPostAlert, onResetDatabase, polos,
                     <span>Redefinir Banco</span>
                   </button>
                 </div>
+
+                {/* Clear Database for Production Section */}
+                <div className="p-4 bg-orange-50/10 border border-orange-200 rounded-xl flex items-center justify-between gap-4">
+                  <div className="text-xs space-y-0.5">
+                    <p className="font-bold text-orange-850 flex items-center gap-1.5" style={{ color: '#c05621' }}>
+                      <Trash2 className="h-4 w-4 text-orange-600" />
+                      Limpar Dados de Produção (Blank Slate)
+                    </p>
+                    <p className="text-gray-500 font-medium">Exclui todos os Alunos, Boletos, Mensagens e Logs correntes. Preserva os modelos de réguas, polos e chaves de API.</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Atenção: Isso excluirá permanentemente todos os Alunos, Boletos, Mensagens e Logs para iniciar o sistema em produção com dados reais. Suas réguas de cobrança e chaves de API serão preservadas. Deseja prosseguir?")) {
+                        onClearDatabase();
+                      }
+                    }}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5 shrink-0 shadow-md"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Limpar para Produção</span>
+                  </button>
+                </div>
+
 
                 <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/10 flex gap-3 text-xs leading-relaxed text-gray-600">
                   <Lock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
