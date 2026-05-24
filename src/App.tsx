@@ -285,7 +285,7 @@ export default function App() {
 
     const timeoutId = setTimeout(syncToBackend, 500);
     return () => clearTimeout(timeoutId);
-  }, [alunos, boletos, mensagens, regras, crmConfig, logs, polos, dbLoaded, isUsingApi]);
+  }, [alunos, boletos, mensagens, regras, crmConfig, logs, polos, users, dbLoaded, isUsingApi]);
 
   // Connection states
   const [whatsappOnline, setWhatsappOnline] = useState<boolean>(true);
