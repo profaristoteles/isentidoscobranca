@@ -115,7 +115,8 @@ export default function ConfiguracoesView({ onPostAlert, onResetDatabase, polos,
         } else if (res.state === 'close') {
           onPostAlert(`Evolution API está online, mas a instância "${evolutionInstance}" está DESCONECTADA do WhatsApp (requer leitura do QR Code).`, 'warning');
         } else {
-          onPostAlert(`Instância "${evolutionInstance}" não está conectada. Estado: ${res.state}. Detalhes: ${res.details || 'Sem detalhes'}`, 'warning');
+          const detailStr = typeof res.details === 'object' ? JSON.stringify(res.details) : String(res.details);
+          onPostAlert(`Instância "${evolutionInstance}" não está conectada. Estado: ${res.state}. Detalhes: ${detailStr}`, 'warning');
         }
       }
     } catch (e: any) {
