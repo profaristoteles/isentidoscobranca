@@ -150,6 +150,8 @@ export default function App() {
 
   // Ref to prevent sync loop when polling updates from backend
   const skipSyncRef = useRef(false);
+  // Ref to block background polling when a local change is pending sync to the backend
+  const pendingSyncRef = useRef(false);
 
   // Initial Fetch from backend DB with LocalStorage fallback
   useEffect(() => {
@@ -186,6 +188,11 @@ export default function App() {
     if (!isUsingApi) return;
     
     const pollUpdates = async () => {
+      // If client has pending local modifications that are not yet saved to the server, skip polling
+      if (pendingSyncRef.current) {
+        return;
+      }
+
       try {
         const response = await fetch('/api/db');
         if (response.ok) {
@@ -217,6 +224,8 @@ export default function App() {
       return;
     }
 
+    pendingSyncRef.current = true; // Block polling while sync is pending
+
     const syncToBackend = async () => {
       try {
         const response = await fetch('/api/save-all', {
@@ -239,6 +248,8 @@ export default function App() {
         }
       } catch (err) {
         console.error('[Sentidos Cobranças] Erro de rede ao sincronizar dados no backend.', err);
+      } finally {
+        pendingSyncRef.current = false; // Unblock polling after sync finishes
       }
     };
 
