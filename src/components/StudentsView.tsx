@@ -24,6 +24,7 @@ interface StudentsViewProps {
   onFastWhatsAppNotification: (student: Aluno) => void;
   onAddAlunos: (novosAlunos: Omit<Aluno, 'id' | 'matricula' | 'valorPendente' | 'statusFinanceiro' | 'cadastroData'>[]) => Aluno[];
   onDeleteAluno: (alunoId: string) => void;
+  onToggleCobrancaAutomatica: (alunoId: string) => void;
 }
 
 export default function StudentsView({ 
@@ -32,7 +33,8 @@ export default function StudentsView({
   onSelectStudent, 
   onFastWhatsAppNotification, 
   onAddAlunos,
-  onDeleteAluno
+  onDeleteAluno,
+  onToggleCobrancaAutomatica
 }: StudentsViewProps) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -325,6 +327,7 @@ export default function StudentsView({
                 <th className="py-4 px-4">Matrícula / CPF</th>
                 <th className="py-4 px-4">Curso / Especialidade</th>
                 <th className="py-4 px-4">WhatsApp</th>
+                <th className="py-4 px-4 text-center">Régua Auto</th>
                 <th className="py-4 px-4 text-center">Situação Financeira</th>
                 <th className="py-4 px-4 text-right">Valor Pendente</th>
                 <th className="py-4 px-6 text-center">Ações</th>
@@ -369,6 +372,26 @@ export default function StudentsView({
                     </td>
                     <td className="py-4 px-4 font-mono font-medium text-gray-600 whitespace-nowrap">
                       {student.whatsapp}
+                    </td>
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => onToggleCobrancaAutomatica(student.id)}
+                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                            student.cobrancaAutomatica !== false ? 'bg-emerald-500' : 'bg-slate-300'
+                          }`}
+                          title={student.cobrancaAutomatica !== false ? 'Desativar régua automática' : 'Ativar régua automática'}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              student.cobrancaAutomatica !== false ? 'translate-x-3' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-[10px] font-semibold ${student.cobrancaAutomatica !== false ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          {student.cobrancaAutomatica !== false ? 'Ativa' : 'Manual'}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-4 px-4 text-center whitespace-nowrap">
                       {getStatusBadge(student.statusFinanceiro)}
@@ -419,7 +442,7 @@ export default function StudentsView({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                  <td colSpan={8} className="py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <UserSquare2 className="h-8 w-8 text-gray-300" />
                       <p className="text-sm font-semibold text-gray-500">Nenhum estudante foi encontrado</p>

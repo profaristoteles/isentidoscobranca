@@ -14,6 +14,7 @@ export interface Aluno {
   avatarUrl?: string;
   cadastroData: string;
   modalidade: 'Presencial' | 'Online';
+  cobrancaAutomatica?: boolean;
 }
 
 export interface Boleto {

@@ -30,6 +30,7 @@ interface StudentDetailViewProps {
   onSendCustomWhatsApp: (alunoId: string, text: string) => void;
   onSimulatePayment: (boletoId: string) => void;
   onSimulateDeal: (alunoId: string, parcelas: number, valorTotal: number) => void;
+  onToggleCobrancaAutomatica: (alunoId: string) => void;
 }
 
 export default function StudentDetailView({ 
@@ -39,7 +40,8 @@ export default function StudentDetailView({
   onBack,
   onSendCustomWhatsApp,
   onSimulatePayment,
-  onSimulateDeal
+  onSimulateDeal,
+  onToggleCobrancaAutomatica
 }: StudentDetailViewProps) {
   const [customMsg, setCustomMsg] = useState('');
   const [isNegotiating, setIsNegotiating] = useState(false);
@@ -115,10 +117,32 @@ export default function StudentDetailView({
             <h2 className="text-base font-bold text-gray-900 mt-3">{student.nome}</h2>
             <p className="text-xs text-gray-400 mt-0.5">{student.curso}</p>
             
-            <div className="mt-3 flex justify-center">
+            <div className="mt-3 flex flex-col items-center gap-2">
               <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${currentStatusDesc.style}`}>
                 {currentStatusDesc.label}
               </span>
+              
+              {/* Billing Switcher Toggle */}
+              <div className="mt-2 w-full flex items-center justify-between bg-slate-50 border border-slate-200/60 rounded-lg p-2.5 text-xs text-slate-700">
+                <div className="text-left font-sans">
+                  <span className="font-bold text-[10px] text-slate-800 uppercase block tracking-wider">Régua de Cobrança</span>
+                  <span className="text-[9px] text-slate-400 font-medium">
+                    {student.cobrancaAutomatica !== false ? 'Envio automático ativo' : 'Disparos apenas manuais'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => onToggleCobrancaAutomatica(student.id)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                    student.cobrancaAutomatica !== false ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      student.cobrancaAutomatica !== false ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Quick stats on student profile */}

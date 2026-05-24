@@ -491,9 +491,14 @@ export default function App() {
       return;
     }
 
-    const overdueBoletos = boletos.filter(b => b.status === 'VENCIDO');
+    const overdueBoletos = boletos.filter(b => {
+      if (b.status !== 'VENCIDO') return false;
+      const student = alunos.find(a => a.id === b.alunoId);
+      return student?.cobrancaAutomatica !== false;
+    });
+
     if (overdueBoletos.length === 0) {
-      postToastAlert('Nenhum boleto em atraso (VENCIDO) localizado no cadastro.', 'warning');
+      postToastAlert('Nenhum boleto em atraso (VENCIDO) com régua de cobrança automática ativa.', 'warning');
       return;
     }
 
@@ -502,6 +507,18 @@ export default function App() {
     });
 
     postToastAlert(`Lote de cobrança disparado! Notificado ${overdueBoletos.length} alunos com pendência.`, 'success');
+  };
+
+  // Operation 4.5: Toggle automatic billing status for a student
+  const handleToggleCobrancaAutomatica = (alunoId: string) => {
+    setAlunos(prev => prev.map(a => {
+      if (a.id === alunoId) {
+        const nextState = a.cobrancaAutomatica === false ? true : false;
+        postToastAlert(`Cobrança automática ${nextState ? 'ativada' : 'desativada'} para ${a.nome}.`, 'success');
+        return { ...a, cobrancaAutomatica: nextState };
+      }
+      return a;
+    }));
   };
 
   // Operation 5: Send chat direct ad-hoc message or human reply
@@ -666,7 +683,8 @@ export default function App() {
         statusFinanceiro: 'EM_DIA',
         valorPendente: 0,
         cadastroData: today,
-        avatarUrl: `https://images.unsplash.com/photo-${index % 2 === 0 ? '1535713875002-d1d0cf377fde' : '1494790108377-be9c29b29330'}?w=150`
+        avatarUrl: `https://images.unsplash.com/photo-${index % 2 === 0 ? '1535713875002-d1d0cf377fde' : '1494790108377-be9c29b29330'}?w=150`,
+        cobrancaAutomatica: true
       };
     });
 
@@ -866,6 +884,7 @@ export default function App() {
                   onSendCustomWhatsApp={(alunoId, txt) => handleSendMessage(alunoId, txt, 'HUMANO_AGENTE')}
                   onSimulatePayment={handleSimulatePayment}
                   onSimulateDeal={handleSimulateDeal}
+                  onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
                 />
               </div>
             );
@@ -880,6 +899,7 @@ export default function App() {
               onFastWhatsAppNotification={handleFastWhatsAppNotification}
               onAddAlunos={handleAddAlunos}
               onDeleteAluno={handleDeleteAluno}
+              onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
             />
           </div>
         );

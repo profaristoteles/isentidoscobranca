@@ -16,7 +16,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
     cadastroData: '2025-01-15',
-    modalidade: 'Presencial'
+    modalidade: 'Presencial',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-2',
@@ -31,7 +32,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 380.00,
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
     cadastroData: '2024-08-10',
-    modalidade: 'Online'
+    modalidade: 'Online',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-3',
@@ -46,7 +48,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 1140.00,
     avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
     cadastroData: '2025-01-11',
-    modalidade: 'Presencial'
+    modalidade: 'Presencial',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-4',
@@ -61,7 +64,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
     cadastroData: '2025-02-01',
-    modalidade: 'Presencial'
+    modalidade: 'Presencial',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-5',
@@ -76,7 +80,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 760.00,
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
     cadastroData: '2024-05-18',
-    modalidade: 'Online'
+    modalidade: 'Online',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-6',
@@ -91,7 +96,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150',
     cadastroData: '2025-03-10',
-    modalidade: 'Presencial'
+    modalidade: 'Presencial',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-7',
@@ -106,7 +112,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 420.00,
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
     cadastroData: '2024-09-02',
-    modalidade: 'Online'
+    modalidade: 'Online',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-8',
@@ -121,7 +128,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
     cadastroData: '2024-07-20',
-    modalidade: 'Presencial'
+    modalidade: 'Presencial',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-9',
@@ -136,7 +144,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 1450.00,
     avatarUrl: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=150',
     cadastroData: '2025-02-15',
-    modalidade: 'Online'
+    modalidade: 'Online',
+    cobrancaAutomatica: true
   },
   {
     id: 'student-10',
@@ -151,7 +160,8 @@ export const INITIAL_ALUNOS: Aluno[] = [
     valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150',
     cadastroData: '2025-03-25',
-    modalidade: 'Presencial'
+    modalidade: 'Presencial',
+    cobrancaAutomatica: true
   }
 ];;
 
