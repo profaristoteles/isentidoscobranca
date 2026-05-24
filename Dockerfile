@@ -17,12 +17,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Instala a ferramenta tsx para rodar o backend TypeScript diretamente
+# tsx está em devDependencies mas é necessário em produção para rodar TypeScript diretamente
 RUN npm install -g tsx
 
 # Copia os arquivos de build do frontend e os arquivos necessários do backend
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/mockData.ts ./src/mockData.ts
+COPY --from=builder /app/database.ts ./database.ts
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
