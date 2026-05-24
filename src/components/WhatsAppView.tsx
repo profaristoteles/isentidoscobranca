@@ -58,8 +58,25 @@ export default function WhatsAppView({
   const [realQrCode, setRealQrCode] = useState<string>('');
   const [loadingQrCode, setLoadingQrCode] = useState<boolean>(false);
 
-  const currentChats = mensagens.filter(m => m.alunoId === selectedChatStudentId);
+  // Sync selectedChatStudentId when alunos list changes (e.g., after PostgreSQL data loads,
+  // after clear-db or after new students are added). This prevents stale student IDs from
+  // breaking the chat view with mock/old data IDs that no longer exist in the real database.
+  useEffect(() => {
+    if (alunos.length > 0) {
+      const currentExists = alunos.some(a => a.id === selectedChatStudentId);
+      if (!currentExists) {
+        // Current selection no longer valid — pick the first available student
+        setSelectedChatStudentId(alunos[1]?.id || alunos[0]?.id || '');
+      }
+    } else {
+      // Database empty (e.g., cleared for production) — reset to empty string
+      setSelectedChatStudentId('');
+    }
+  }, [alunos]);
+
+  // Always derive selectedStudent from the current valid selectedChatStudentId
   const selectedStudent = alunos.find(a => a.id === selectedChatStudentId) || alunos[0];
+  const currentChats = mensagens.filter(m => m.alunoId === (selectedStudent?.id ?? selectedChatStudentId));
 
   const getGeminiApiKey = () => {
     const settings = getAISettings();
