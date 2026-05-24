@@ -37,7 +37,8 @@ import {
   WhatsAppMensagem, 
   CobrancaRegra, 
   CrmConfig, 
-  LogAtividade 
+  LogAtividade,
+  Colaborador
 } from './types';
 import { 
   INITIAL_ALUNOS, 
@@ -46,7 +47,8 @@ import {
   INITIAL_COBRANCA_REGRAS, 
   INITIAL_CRM_CONFIG, 
   INITIAL_LOGS_ATIVIDADE,
-  INITIAL_POLOS
+  INITIAL_POLOS,
+  INITIAL_USERS
 } from './mockData';
 
 export default function App() {
@@ -118,6 +120,14 @@ export default function App() {
       return INITIAL_LOGS_ATIVIDADE;
     }
   });
+  const [users, setUsers] = useState<Colaborador[]>(() => {
+    try {
+      const local = localStorage.getItem('sentidos_users');
+      return local ? JSON.parse(local) : INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
+  });
 
   // LocalStorage sync effects
   useEffect(() => {
@@ -148,6 +158,10 @@ export default function App() {
     localStorage.setItem('sentidos_logs', JSON.stringify(logs));
   }, [logs]);
 
+  useEffect(() => {
+    localStorage.setItem('sentidos_users', JSON.stringify(users));
+  }, [users]);
+
   // Ref to prevent sync loop when polling updates from backend
   const skipSyncRef = useRef(false);
   // Ref to block background polling when a local change is pending sync to the backend
@@ -168,6 +182,7 @@ export default function App() {
           if (data.crmConfig) setCrmConfig(data.crmConfig);
           if (data.logs) setLogs(data.logs);
           if (data.polos) setPolos(data.polos);
+          if (data.users) setUsers(data.users);
           
           setIsUsingApi(true);
           console.log('[Sentidos Cobranças] Banco de dados carregado com sucesso do backend.');
@@ -205,6 +220,7 @@ export default function App() {
           if (data.crmConfig) setCrmConfig(data.crmConfig);
           if (data.logs) setLogs(data.logs);
           if (data.polos) setPolos(data.polos);
+          if (data.users) setUsers(data.users);
         }
       } catch (err) {
         console.warn('[Sentidos Cobranças] Erro ao buscar atualizações em segundo plano:', err);
@@ -241,6 +257,7 @@ export default function App() {
             crmConfig,
             logs,
             polos,
+            users,
           }),
         });
         if (!response.ok) {
@@ -689,7 +706,7 @@ export default function App() {
         const result = await response.json();
         // Hydrate frontend state
         if (result.data) {
-          const { alunos, boletos, mensagens, regras, crmConfig, logs, polos } = result.data;
+          const { alunos, boletos, mensagens, regras, crmConfig, logs, polos, users } = result.data;
           setAlunos(alunos);
           setBoletos(boletos);
           setMensagens(mensagens);
@@ -697,6 +714,7 @@ export default function App() {
           setCrmConfig(crmConfig);
           setLogs(logs);
           if (polos) setPolos(polos);
+          if (users) setUsers(users);
         }
         
         // Remove localStorage items to ensure clean state
@@ -707,6 +725,7 @@ export default function App() {
         localStorage.removeItem('sentidos_crmConfig');
         localStorage.removeItem('sentidos_logs');
         localStorage.removeItem('sentidos_polos');
+        localStorage.removeItem('sentidos_users');
         
         postToastAlert('Banco de dados local (JSON) redefinido para o padrão com sucesso!', 'success');
       } else {
@@ -721,6 +740,7 @@ export default function App() {
       localStorage.removeItem('sentidos_crmConfig');
       localStorage.removeItem('sentidos_logs');
       localStorage.removeItem('sentidos_polos');
+      localStorage.removeItem('sentidos_users');
 
       setAlunos(INITIAL_ALUNOS);
       setBoletos(INITIAL_BOLETOS);
@@ -729,6 +749,7 @@ export default function App() {
       setCrmConfig(INITIAL_CRM_CONFIG);
       setLogs(INITIAL_LOGS_ATIVIDADE);
       setPolos(INITIAL_POLOS);
+      setUsers(INITIAL_USERS);
 
       postToastAlert('Banco offline (localStorage) redefinido para o padrão!', 'success');
     }
@@ -930,6 +951,8 @@ export default function App() {
               polos={polos}
               onUpdatePolos={setPolos}
               alunos={alunos}
+              users={users}
+              onUpdateUsers={setUsers}
             />
           </div>
         );

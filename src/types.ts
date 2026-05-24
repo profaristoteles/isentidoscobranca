@@ -76,3 +76,13 @@ export interface LogAtividade {
   detalhe: string;
   sucesso: boolean;
 }
+
+export interface Colaborador {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  role: 'Administrador' | 'Financeiro' | 'Secretaria';
+  active: boolean;
+}
+

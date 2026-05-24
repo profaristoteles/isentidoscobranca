@@ -22,7 +22,7 @@ import {
   Smartphone,
   Globe
 } from 'lucide-react';
-import { Aluno } from '../types';
+import { Aluno, Colaborador } from '../types';
 import { checkConnectionStatus } from '../services/whatsappService';
 
 
@@ -33,6 +33,8 @@ interface ConfiguracoesViewProps {
   polos: string[];
   onUpdatePolos: (newPolos: string[]) => void;
   alunos: Aluno[];
+  users: Colaborador[];
+  onUpdateUsers: (newUsers: Colaborador[]) => void;
 }
 
 interface MockUser {
@@ -43,13 +45,27 @@ interface MockUser {
   active: boolean;
 }
 
-export default function ConfiguracoesView({ onPostAlert, onResetDatabase, onClearDatabase, polos, onUpdatePolos, alunos }: ConfiguracoesViewProps) {
-  // Users list State
-  const [users, setUsers] = useState<MockUser[]>([
-    { id: 'usr-1', name: 'Ana Carolina Meireles', email: 'secretaria.sentidos@sentidos.edu.br', role: 'Secretaria', active: true },
-    { id: 'usr-2', name: 'Francisco Santos Moura', email: 'financeiro.faepi@faepi.org', role: 'Financeiro', active: true },
-    { id: 'usr-3', name: 'Rodrigo Lemos Ramos', email: 'r.lemos@sentidos.edu.br', role: 'Administrador', active: true },
-  ]);
+export default function ConfiguracoesView({ 
+  onPostAlert, 
+  onResetDatabase, 
+  onClearDatabase, 
+  polos, 
+  onUpdatePolos, 
+  alunos,
+  users,
+  onUpdateUsers
+}: ConfiguracoesViewProps) {
+  
+  // Registration form state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<Colaborador['role']>('Financeiro');
+
+  // Password editing state
+  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null);
+  const [newPasswordValue, setNewPasswordValue] = useState('');
 
   const [lgpdConsent, setLgpdConsent] = useState(true);
   const [lgpdAnonCpf, setLgpdAnonCpf] = useState(false);
@@ -156,18 +172,68 @@ export default function ConfiguracoesView({ onPostAlert, onResetDatabase, onClea
   };
 
   // Add mock administrator
-  const handleAddMockUser = () => {
-    const roles: MockUser['role'][] = ['Financeiro', 'Secretaria'];
-    const randomRole = roles[Math.floor(Math.random() * roles.length)];
-    const newUser: MockUser = {
+  const handleRegisterColaborador = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      onPostAlert('Todos os campos são obrigatórios.', 'warning');
+      return;
+    }
+    if (users.some(u => u.email.toLowerCase() === newUserEmail.trim().toLowerCase())) {
+      onPostAlert('Já existe um colaborador com este e-mail.', 'warning');
+      return;
+    }
+
+    const newUser: Colaborador = {
       id: `usr-${Date.now()}`,
-      name: 'Novo Atendente Colaborador',
-      email: `financeiro.${Math.floor(100+Math.random()*900)}@sentidos.edu.br`,
-      role: randomRole,
+      name: newUserName.trim(),
+      email: newUserEmail.trim(),
+      password: newUserPassword.trim(),
+      role: newUserRole,
       active: true
     };
-    setUsers(prev => [...prev, newUser]);
-    onPostAlert('Novo perfil de colaborador cadastrado com perfil restrito!', 'success');
+
+    onUpdateUsers([...users, newUser]);
+    onPostAlert(`Colaborador "${newUser.name}" cadastrado com sucesso!`, 'success');
+    
+    // Reset form
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserRole('Financeiro');
+    setShowAddForm(false);
+  };
+
+  const handleUpdatePassword = (userId: string) => {
+    if (!newPasswordValue.trim()) {
+      onPostAlert('A senha não pode ser vazia.', 'warning');
+      return;
+    }
+    const updatedUsers = users.map(u => {
+      if (u.id === userId) {
+        return { ...u, password: newPasswordValue.trim() };
+      }
+      return u;
+    });
+    onUpdateUsers(updatedUsers);
+    onPostAlert('Senha atualizada com sucesso!', 'success');
+    setEditingPasswordUserId(null);
+    setNewPasswordValue('');
+  };
+
+  const handleDeleteColaborador = (id: string, name: string) => {
+    // Prevent deleting all administrators
+    const adminCount = users.filter(u => u.role === 'Administrador').length;
+    const targetUser = users.find(u => u.id === id);
+    if (targetUser?.role === 'Administrador' && adminCount <= 1) {
+      onPostAlert('Não é possível excluir o único administrador do sistema.', 'error');
+      return;
+    }
+
+    if (window.confirm(`Tem certeza que deseja excluir o colaborador "${name}"?`)) {
+      const updatedUsers = users.filter(u => u.id !== id);
+      onUpdateUsers(updatedUsers);
+      onPostAlert(`Colaborador "${name}" excluído com sucesso.`, 'success');
+    }
   };
 
   const handleBackup = () => {
@@ -259,40 +325,163 @@ export default function ConfiguracoesView({ onPostAlert, onResetDatabase, onClea
                   <h3 className="text-sm font-bold text-gray-900">Membros de Operações</h3>
                   <p className="text-xs text-gray-400">Usuários cadastrados no Instituto Sentidos para operar a esteira financeira</p>
                 </div>
-                <button
-                  onClick={handleAddMockUser}
-                  className="bg-[#03045e] hover:bg-blue-900 text-white font-bold text-xs px-3.5 py-1.8 rounded-lg transition cursor-pointer flex items-center gap-1.5"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span>Cadastrar Colaborador</span>
-                </button>
+                {!showAddForm && (
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="bg-[#03045e] hover:bg-blue-900 text-white font-bold text-xs px-3.5 py-1.8 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>Cadastrar Colaborador</span>
+                  </button>
+                )}
               </div>
 
+              {/* Inline Form to Add New User */}
+              {showAddForm && (
+                <form onSubmit={handleRegisterColaborador} className="p-4 bg-slate-50/50 border border-slate-100 rounded-xl space-y-3.5 animate-slide-up">
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <p className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Novo Colaborador</p>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowAddForm(false)}
+                      className="text-xs text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-bold block mb-1">Nome Completo</label>
+                      <input
+                        type="text"
+                        placeholder="Nome do Colaborador"
+                        value={newUserName}
+                        onChange={(e) => setNewUserName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-bold block mb-1">E-mail (Login)</label>
+                      <input
+                        type="email"
+                        placeholder="exemplo@sentidos.edu.br"
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-bold block mb-1">Senha de Acesso</label>
+                      <input
+                        type="password"
+                        placeholder="Senha de acesso"
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 font-bold block mb-1">Perfil / Permissão</label>
+                      <select
+                        value={newUserRole}
+                        onChange={(e) => setNewUserRole(e.target.value as any)}
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-blue-550 focus:outline-hidden"
+                      >
+                        <option value="Administrador">Administrador</option>
+                        <option value="Financeiro">Financeiro</option>
+                        <option value="Secretaria">Secretaria</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
+                    >
+                      Salvar Cadastro
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Collaborators List */}
               <div className="space-y-2">
                 {users.map((item) => (
-                  <div key={item.id} className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs flex justify-between items-center gap-4 transition hover:bg-slate-100/50">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-[#03045e]/10 text-[#03045e] font-bold text-xs flex items-center justify-center">
-                        {item.name.substring(0, 2).toUpperCase()}
+                  <div key={item.id} className="p-3.5 bg-slate-50 border border-slate-100 rounded-lg text-xs flex flex-col gap-2.5 transition hover:bg-slate-100/50">
+                    <div className="flex justify-between items-center gap-4 w-full">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-[#03045e]/10 text-[#03045e] font-bold text-xs flex items-center justify-center shrink-0">
+                          {item.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-800 leading-tight">{item.name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{item.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-800 leading-tight">{item.name}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{item.email}</p>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          item.role === 'Administrador' 
+                            ? 'bg-rose-50 text-rose-700' 
+                            : item.role === 'Financeiro' 
+                              ? 'bg-blue-50 text-blue-700' 
+                              : 'bg-amber-50 text-amber-700'
+                        }`}>
+                          {item.role}
+                        </span>
+                        
+                        {/* Action buttons */}
+                        <button
+                          onClick={() => {
+                            setEditingPasswordUserId(editingPasswordUserId === item.id ? null : item.id);
+                            setNewPasswordValue('');
+                          }}
+                          className="p-1 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                          title="Alterar Senha"
+                        >
+                          <Lock className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteColaborador(item.id, item.name)}
+                          className="p-1 text-rose-450 hover:text-rose-600 text-rose-400 transition cursor-pointer"
+                          title="Excluir Colaborador"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        item.role === 'Administrador' 
-                          ? 'bg-rose-50 text-rose-700' 
-                          : item.role === 'Financeiro' 
-                            ? 'bg-blue-50 text-blue-700' 
-                            : 'bg-amber-50 text-amber-700'
-                      }`}>
-                        {item.role}
-                      </span>
-                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">Ativo</span>
-                    </div>
+                    {/* Inline password edit form */}
+                    {editingPasswordUserId === item.id && (
+                      <div className="mt-1 pt-2 border-t border-slate-200/50 flex gap-2 items-center">
+                        <div className="flex-1 max-w-xs">
+                          <input
+                            type="password"
+                            placeholder="Nova senha para este usuário"
+                            value={newPasswordValue}
+                            onChange={(e) => setNewPasswordValue(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg text-[10px] p-2 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                            required
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleUpdatePassword(item.id)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-3.5 py-2 rounded-lg transition cursor-pointer"
+                        >
+                          Alterar Senha
+                        </button>
+                        <button
+                          onClick={() => setEditingPasswordUserId(null)}
+                          className="text-slate-400 hover:text-slate-650 text-slate-500 hover:text-slate-700 text-[10px] cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

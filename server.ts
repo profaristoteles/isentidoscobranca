@@ -9,7 +9,8 @@ import {
   INITIAL_COBRANCA_REGRAS, 
   INITIAL_CRM_CONFIG, 
   INITIAL_LOGS_ATIVIDADE,
-  INITIAL_POLOS
+  INITIAL_POLOS,
+  INITIAL_USERS
 } from './src/mockData';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +53,10 @@ const readDB = () => {
       parsed.polos = INITIAL_POLOS;
       updated = true;
     }
+    if (!parsed.users) {
+      parsed.users = INITIAL_USERS;
+      updated = true;
+    }
     if (parsed.alunos && Array.isArray(parsed.alunos)) {
       parsed.alunos = parsed.alunos.map((a: any) => {
         if (!a.modalidade) {
@@ -88,7 +93,8 @@ const getInitialData = () => {
     regras: INITIAL_COBRANCA_REGRAS,
     crmConfig: INITIAL_CRM_CONFIG,
     logs: INITIAL_LOGS_ATIVIDADE,
-    polos: INITIAL_POLOS
+    polos: INITIAL_POLOS,
+    users: INITIAL_USERS
   };
 };
 
@@ -97,6 +103,18 @@ app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'E-mail e senha são obrigatórios.' });
+  }
+
+  const db = readDB();
+  const matchedUser = db.users?.find((u: any) => u.email === email && u.password === password);
+
+  if (matchedUser) {
+    return res.json({ 
+      success: true, 
+      message: 'Autenticado com sucesso!', 
+      user: { email: matchedUser.email, name: matchedUser.name, role: matchedUser.role },
+      token: `demo-token-${Date.now()}`
+    });
   }
 
   if (email === 'isentidosedu@gmail.com' && password === 'sentidos123') {
@@ -108,7 +126,7 @@ app.post('/api/login', (req, res) => {
     });
   }
 
-  return res.status(401).json({ success: false, message: 'Credenciais inválidas para o painel FAEPI. Use isentidosedu@gmail.com / sentidos123.' });
+  return res.status(401).json({ success: false, message: 'Credenciais inválidas para o painel FAEPI.' });
 });
 
 // Status / Health check
@@ -134,7 +152,7 @@ app.post('/api/save-all', (req, res) => {
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ success: false, message: 'Dados inválidos' });
   }
-  const required = ['alunos', 'boletos', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos'];
+  const required = ['alunos', 'boletos', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'users'];
   const hasRequired = required.every(key => key in data);
   if (!hasRequired) {
     return res.status(400).json({ success: false, message: 'Dados incompletos para persistência' });

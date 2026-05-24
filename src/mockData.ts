@@ -1,4 +1,4 @@
-import { Aluno, Boleto, WhatsAppMensagem, CobrancaRegra, CrmConfig, LogAtividade } from './types';
+import { Aluno, Boleto, WhatsAppMensagem, CobrancaRegra, CrmConfig, LogAtividade, Colaborador } from './types';
 
 export const INITIAL_POLOS: string[] = ['Teresina (Sede)', 'Parnaíba', 'Floriano', 'Picos'];
 
@@ -539,4 +539,11 @@ export const INITIAL_LOGS_ATIVIDADE: LogAtividade[] = [
     detalhe: 'Mudança de status para Atendimento Humano assumido no chat do aluno Ricardo de Moura.',
     sucesso: true
   }
+];
+
+export const INITIAL_USERS: Colaborador[] = [
+  { id: 'usr-1', name: 'Ana Carolina Meireles', email: 'secretaria.sentidos@sentidos.edu.br', password: 'sentidos123', role: 'Secretaria', active: true },
+  { id: 'usr-2', name: 'Francisco Santos Moura', email: 'financeiro.faepi@faepi.org', password: 'sentidos123', role: 'Financeiro', active: true },
+  { id: 'usr-3', name: 'Rodrigo Lemos Ramos', email: 'r.lemos@sentidos.edu.br', password: 'sentidos123', role: 'Administrador', active: true },
+  { id: 'usr-4', name: 'Admin Geral', email: 'isentidosedu@gmail.com', password: 'sentidos123', role: 'Administrador', active: true }
 ];
