@@ -20,6 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Aluno, Boleto, WhatsAppMensagem } from '../types';
+import { isBoletoExpired } from '../utils/dateHelpers';
 
 interface StudentDetailViewProps {
   student: Aluno;
@@ -256,61 +257,76 @@ export default function StudentDetailView({
             </h3>
 
             <div className="space-y-3">
-              {studentBoletos.map((boleto) => (
-                <div 
-                  key={boleto.id} 
-                  className={`p-4 rounded-xl border text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3 transition hover:shadow-xs ${
-                    boleto.status === 'PAGO' 
-                      ? 'bg-emerald-50/20 border-emerald-100' 
-                      : boleto.status === 'VENCIDO' 
-                        ? 'bg-rose-50/10 border-rose-100' 
-                        : 'bg-white border-gray-100'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-800">Comp: {boleto.competencia}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        boleto.status === 'PAGO' 
-                          ? 'bg-emerald-100 text-emerald-800' 
+              {studentBoletos.map((boleto) => {
+                const isExpired = isBoletoExpired(boleto.vencimento, boleto.status);
+                return (
+                  <div 
+                    key={boleto.id} 
+                    className={`p-4 rounded-xl border text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3 transition hover:shadow-xs w-full ${
+                      boleto.status === 'PAGO' 
+                        ? 'bg-emerald-50/20 border-emerald-100' 
+                        : isExpired
+                          ? 'bg-rose-50/40 border-rose-200 shadow-3xs'
                           : boleto.status === 'VENCIDO' 
-                            ? 'bg-rose-100 text-rose-800' 
-                            : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {boleto.status}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 font-mono">Nosso Nº: {boleto.nossoNumero}</p>
-                    <p className="text-[10px] text-gray-500 font-mono select-all" title="Copiar Linha Digitável">
-                      {boleto.linhaDigitavel}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto shrink-0 border-t md:border-t-0 border-gray-50 pt-2 md:pt-0 gap-2">
-                    <p className="font-extrabold text-gray-900 font-mono text-sm self-center md:self-end">
-                      R$ {boleto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    <div className="flex gap-1.5">
-                      {/* Simulate payment button */}
-                      {boleto.status !== 'PAGO' && (
-                        <button
-                          onClick={() => onSimulatePayment(boleto.id)}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-2 py-1.5 rounded text-[10px] transition cursor-pointer"
-                        >
-                          Simular Pago
-                        </button>
+                            ? 'bg-rose-50/10 border-rose-100' 
+                            : 'bg-white border-gray-100'
+                    }`}
+                  >
+                    <div className="space-y-1 w-full md:w-auto flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-gray-800">Comp: {boleto.competencia}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                          boleto.status === 'PAGO' 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : boleto.status === 'VENCIDO' 
+                              ? 'bg-rose-100 text-rose-800' 
+                              : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {boleto.status}
+                        </span>
+                        {isExpired && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wide animate-pulse">
+                            Expirado (&gt;30 dias) - Requer Novo Boleto FAEPI
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-mono">Nosso Nº: {boleto.nossoNumero}</p>
+                      <p className="text-[10px] text-gray-500 font-mono select-all" title="Copiar Linha Digitável">
+                        {boleto.linhaDigitavel}
+                      </p>
+                      {isExpired && (
+                        <p className="text-[10px] text-rose-600 font-medium bg-rose-50 border border-rose-100/50 p-2 rounded-lg mt-1.5 leading-relaxed">
+                          ⚠️ <strong>Atenção:</strong> Este boleto venceu há mais de 30 dias. Bancos rejeitam o pagamento. Acesse o sistema EduK da FAEPI para retirar um boleto atualizado e substituí-lo no sistema.
+                        </p>
                       )}
-                      <button
-                        onClick={() => alert(`Visualizando PDF do Boleto ${boleto.nossoNumero}`)}
-                        className="bg-gray-50 border border-gray-200 hover:bg-gray-100 p-1.5 text-gray-600 rounded"
-                        title="Baixar PDF do Boleto"
-                      >
-                        <FileDown className="h-3.5 w-3.5" />
-                      </button>
+                    </div>
+
+                    <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto shrink-0 border-t md:border-t-0 border-gray-50 pt-2 md:pt-0 gap-2">
+                      <p className="font-extrabold text-gray-900 font-mono text-sm self-center md:self-end">
+                        R$ {boleto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      <div className="flex gap-1.5">
+                        {/* Simulate payment button */}
+                        {boleto.status !== 'PAGO' && (
+                          <button
+                            onClick={() => onSimulatePayment(boleto.id)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-2 py-1.5 rounded text-[10px] transition cursor-pointer"
+                          >
+                            Simular Pago
+                          </button>
+                        )}
+                        <button
+                          onClick={() => alert(`Visualizando PDF do Boleto ${boleto.nossoNumero}`)}
+                          className="bg-gray-50 border border-gray-200 hover:bg-gray-100 p-1.5 text-gray-600 rounded"
+                          title="Baixar PDF do Boleto"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

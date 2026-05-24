@@ -14,6 +14,7 @@ import {
   Play
 } from 'lucide-react';
 import { Boleto, Aluno } from '../types';
+import { isBoletoExpired } from '../utils/dateHelpers';
 
 interface BoletosViewProps {
   boletos: Boleto[];
@@ -33,6 +34,10 @@ export default function BoletosView({
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const expiredCount = useMemo(() => {
+    return boletos.filter(b => isBoletoExpired(b.vencimento, b.status)).length;
+  }, [boletos]);
 
   const filteredBoletos = useMemo(() => {
     return boletos.filter(b => {
@@ -101,6 +106,23 @@ export default function BoletosView({
           <span>Cobrar Todos os Vencidos (WhatsApp)</span>
         </button>
       </div>
+
+      {/* Expired Boletos Warning Banner */}
+      {expiredCount > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-fade-in">
+          <div className="p-2 bg-rose-100 text-rose-700 rounded-lg shrink-0">
+            <AlertOctagon className="h-5 w-5 animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-rose-800 uppercase tracking-wider">
+              Atenção: Boletos Expirados Requerem Ação Manual
+            </h3>
+            <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+              Existem <strong className="text-rose-900">{expiredCount}</strong> boletos vencidos há mais de 30 dias que <strong>não aceitam mais pagamento</strong>. Você deve copiá-los do sistema da FAEPI (EduK) e substituí-los no nosso sistema (fazendo a exclusão/baixa e importação do novo faturamento).
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -189,82 +211,99 @@ export default function BoletosView({
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs">
               {filteredBoletos.length > 0 ? (
-                filteredBoletos.map((boleto) => (
-                  <tr key={boleto.id} className="hover:bg-slate-50/40 transition">
-                    <td className="py-4 px-6">
-                      <div>
-                        <span className="font-bold text-gray-900 block">{boleto.alunoNome}</span>
-                        <span className="text-[10px] text-gray-400">ID Título: {boleto.id}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <p className="font-semibold text-gray-700">Ref: {boleto.competencia}</p>
-                      <p className="text-[10px] text-[#ff8000] font-bold mt-0.5 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Vence: {boleto.vencimento}
-                      </p>
-                    </td>
-                    <td className="py-4 px-4 font-bold font-mono text-gray-800">
-                      R$ {boleto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="font-mono text-gray-600 bg-gray-50 border border-gray-100 px-1.5 py-1 rounded text-[10px] font-semibold">
-                        {boleto.nossoNumero}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      {getStatusBadge(boleto.status)}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-[10px]">
-                        <p className="font-bold text-gray-800">{boleto.enviadoWhatsAppCount} disparos</p>
-                        {boleto.ultimoEnvio ? (
-                          <p className="text-gray-400 mt-0.5 font-mono">Último: {boleto.ultimoEnvio}</p>
-                        ) : (
-                          <p className="text-gray-300 mt-0.5">Sem envio ativo</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex justify-center items-center gap-2">
-                        {/* Copy digital code */}
-                        <button 
-                          onClick={() => copyToClipboard(boleto.linhaDigitavel, boleto.id)}
-                          className="bg-gray-50 hover:bg-gray-100 p-2 border border-gray-200 text-gray-600 rounded-lg transition shrink-0 cursor-pointer flex items-center gap-1"
-                          title="Copiar Código de Barras"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                          <span className="text-[9px] font-semibold font-sans">{copiedId === boleto.id ? 'Copiado!' : 'Cód'}</span>
-                        </button>
-
-                        {/* Simulate Pay Trigger */}
-                        {boleto.status !== 'PAGO' && (
-                          <button
-                            onClick={() => onSimulatePayment(boleto.id)}
-                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 font-bold px-2 py-1.5 rounded-lg border border-emerald-200 text-[10px] transition cursor-pointer shrink-0"
+                filteredBoletos.map((boleto) => {
+                  const isExpired = isBoletoExpired(boleto.vencimento, boleto.status);
+                  return (
+                    <tr 
+                      key={boleto.id} 
+                      className={`transition ${
+                        isExpired 
+                          ? 'bg-rose-50/30 hover:bg-rose-50/50' 
+                          : 'hover:bg-slate-50/40'
+                      }`}
+                    >
+                      <td className="py-4 px-6">
+                        <div>
+                          <span className="font-bold text-gray-900 block">{boleto.alunoNome}</span>
+                          <span className="text-[10px] text-gray-400">ID Título: {boleto.id}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="font-semibold text-gray-700">Ref: {boleto.competencia}</p>
+                        <p className="text-[10px] text-[#ff8000] font-bold mt-0.5 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Vence: {boleto.vencimento}
+                        </p>
+                      </td>
+                      <td className="py-4 px-4 font-bold font-mono text-gray-800">
+                        R$ {boleto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="font-mono text-gray-600 bg-gray-50 border border-gray-100 px-1.5 py-1 rounded text-[10px] font-semibold">
+                          {boleto.nossoNumero}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          {getStatusBadge(boleto.status)}
+                          {isExpired && (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wide animate-pulse">
+                              Expirado (&gt;30d) - Substituir FAEPI
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="text-[10px]">
+                          <p className="font-bold text-gray-800">{boleto.enviadoWhatsAppCount} disparos</p>
+                          {boleto.ultimoEnvio ? (
+                            <p className="text-gray-400 mt-0.5 font-mono">Último: {boleto.ultimoEnvio}</p>
+                          ) : (
+                            <p className="text-gray-300 mt-0.5">Sem envio ativo</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex justify-center items-center gap-2">
+                          {/* Copy digital code */}
+                          <button 
+                            onClick={() => copyToClipboard(boleto.linhaDigitavel, boleto.id)}
+                            className="bg-gray-50 hover:bg-gray-100 p-2 border border-gray-200 text-gray-600 rounded-lg transition shrink-0 cursor-pointer flex items-center gap-1"
+                            title="Copiar Código de Barras"
                           >
-                            Simular Pago
+                            <Copy className="h-3.5 w-3.5" />
+                            <span className="text-[9px] font-semibold font-sans">{copiedId === boleto.id ? 'Copiado!' : 'Cód'}</span>
                           </button>
-                        )}
 
-                        {/* Direct WhatsApp notify */}
-                        <button 
-                          onClick={() => onTriggerSingleBoletoWhatsApp(boleto)}
-                          disabled={boleto.status === 'PAGO'}
-                          className={`p-2 rounded-lg border transition cursor-pointer flex items-center gap-1 ${
-                            boleto.status === 'PAGO'
-                              ? 'text-gray-300 bg-gray-50 border-gray-100 pointer-events-none'
-                              : 'text-orange-500 bg-orange-50/40 hover:bg-orange-50 border-[#ff8000]/20'
-                          }`}
-                          title="Cobrar este Boleto (WhatsApp)"
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          <span className="text-[9px] font-bold font-sans">Cobrar</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {/* Simulate Pay Trigger */}
+                          {boleto.status !== 'PAGO' && (
+                            <button
+                              onClick={() => onSimulatePayment(boleto.id)}
+                              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 font-bold px-2 py-1.5 rounded-lg border border-emerald-200 text-[10px] transition cursor-pointer shrink-0"
+                            >
+                              Simular Pago
+                            </button>
+                          )}
+
+                          {/* Direct WhatsApp notify */}
+                          <button 
+                            onClick={() => onTriggerSingleBoletoWhatsApp(boleto)}
+                            disabled={boleto.status === 'PAGO'}
+                            className={`p-2 rounded-lg border transition cursor-pointer flex items-center gap-1 ${
+                              boleto.status === 'PAGO'
+                                ? 'text-gray-300 bg-gray-50 border-gray-100 pointer-events-none'
+                                : 'text-orange-500 bg-orange-50/40 hover:bg-orange-50 border-[#ff8000]/20'
+                            }`}
+                            title="Cobrar este Boleto (WhatsApp)"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span className="text-[9px] font-bold font-sans">Cobrar</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-gray-400">

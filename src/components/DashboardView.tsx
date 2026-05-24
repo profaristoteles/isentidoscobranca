@@ -30,6 +30,7 @@ import {
   Cell
 } from 'recharts';
 import { Aluno, Boleto, LogAtividade } from '../types';
+import { isBoletoExpired } from '../utils/dateHelpers';
 
 // Custom sleek glassmorphic tooltips for Recharts
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -132,6 +133,12 @@ export default function DashboardView({ alunos, boletos, logs, onSetTab }: Dashb
   const totalCobrancasEnviadas = filteredBoletos.reduce((acc, curr) => acc + curr.enviadoWhatsAppCount, 0) * 10;
   const taxaRecuperacaoEstimada = filteredBoletos.filter(b => b.status === 'PAGO').length > 0 ? 68.4 : 0;
 
+  // Expired boletos calculation (>30 days overdue)
+  const expiredBoletos = filteredBoletos.filter(b => isBoletoExpired(b.vencimento, b.status));
+  const totalExpiradoCalculado = expiredBoletos.reduce((acc, curr) => acc + curr.valor, 0);
+  const totalExpirado = scaleCurrency(totalExpiradoCalculado);
+  const totalExpiradoCount = expiredBoletos.length;
+
   // Inadimplência Chart data
   const inadimplenciaMensalData = [
     { mes: 'Jan', taxa: 18.5, meta: 12.0 },
@@ -215,6 +222,31 @@ export default function DashboardView({ alunos, boletos, logs, onSetTab }: Dashb
           </button>
         </div>
       </div>
+
+      {/* Expired Boletos Warning Banner */}
+      {totalExpiradoCount > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-lg shrink-0">
+              <AlertOctagon className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-rose-800 uppercase tracking-wider">
+                Atenção: Boletos Fora do Período de Pagamento
+              </h3>
+              <p className="text-[11px] text-rose-750 text-rose-700 mt-0.5 leading-relaxed">
+                Existem <strong className="text-rose-900">{totalExpiradoCount}</strong> títulos expirados (vencidos há mais de 30 dias). O aluno não consegue pagá-los na rede bancária e eles <strong className="text-rose-900">requerem substituição manual</strong> com um novo boleto retirado do sistema da FAEPI (EduK).
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => onSetTab('boletos')}
+            className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition whitespace-nowrap shadow-sm"
+          >
+            Substituir no Painel de Boletos
+          </button>
+        </div>
+      )}
 
       {/* Interactive Filters Panel */}
       <div className="bg-white p-4 rounded-xl border border-gray-150 border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -333,20 +365,29 @@ export default function DashboardView({ alunos, boletos, logs, onSetTab }: Dashb
         </div>
 
         {/* Card 4: Boletos Vencidos */}
-        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs flex flex-col justify-between hover:shadow-md transition">
+        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs flex flex-col justify-between hover:shadow-md transition relative overflow-hidden">
+          {totalExpiradoCount > 0 && (
+            <div className="absolute top-0 right-0 left-0 h-1 bg-rose-500" />
+          )}
           <div className="flex justify-between items-start">
             <span className="text-xs font-semibold text-gray-500 font-sans">Montante Vencido</span>
-            <div className="p-1.5 bg-rose-50 rounded-lg text-rose-600">
+            <div className={`p-1.5 rounded-lg ${totalExpiradoCount > 0 ? 'bg-rose-100 text-rose-700 animate-pulse' : 'bg-rose-50 text-rose-600'}`}>
               <AlertOctagon className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-2">
-            <span className="text-lg font-bold text-gray-900 font-mono">
+            <span className="text-lg font-bold text-gray-900 font-mono block">
               R$ {totalVencido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
-            <p className="text-[10px] font-medium text-rose-600 mt-0.5">
-              Refere-se ao montante para cobrança
-            </p>
+            {totalExpiradoCount > 0 ? (
+              <p className="text-[9px] font-semibold text-rose-600 mt-0.5 leading-tight">
+                Contém <span className="underline">R$ {totalExpirado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span> expirados (&gt;30 dias)
+              </p>
+            ) : (
+              <p className="text-[10px] font-medium text-rose-500 mt-0.5">
+                Refere-se ao montante para cobrança
+              </p>
+            )}
           </div>
         </div>
 
