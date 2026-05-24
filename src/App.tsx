@@ -933,13 +933,14 @@ export default function App() {
       case 'whatsapp':
         return (
           <div className="animate-fade-in transition duration-300">
-            <WhatsAppView 
+            <WhatsAppView
               alunos={alunos}
               mensagens={mensagens}
               onSendMessage={handleSendMessage}
               whatsappOnline={whatsappOnline}
               onSetWhatsappOnline={setWhatsappOnline}
               onPostAlert={postToastAlert}
+              onSetTab={setCurrentTab}
             />
           </div>
         );

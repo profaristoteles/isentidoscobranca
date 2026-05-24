@@ -1,29 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  QrCode, 
-  RefreshCw, 
-  CheckCircle, 
-  Smartphone, 
-  SmartphoneNfc, 
-  Wifi, 
-  Terminal, 
-  User, 
+import {
+  QrCode,
+  RefreshCw,
+  SmartphoneNfc,
+  Terminal,
+  User,
+  Users,
+  Upload,
   Send,
   MessageSquare,
-  AlertOctagon,
-  Sparkles,
   Zap,
-  PowerOff,
-  UserCheck
+  PowerOff
 } from 'lucide-react';
 import { Aluno, WhatsAppMensagem } from '../types';
 import { generateTextWithActiveAI, getAISettings } from '../services/aiService';
-import { 
-  isEvolutionConfigured, 
-  checkConnectionStatus, 
-  getQrCode, 
-  logoutInstance, 
-  sendTextMessage,
+import {
+  isEvolutionConfigured,
+  checkConnectionStatus,
+  getQrCode,
+  logoutInstance,
   getEvolutionSettings
 } from '../services/whatsappService';
 
@@ -34,15 +29,17 @@ interface WhatsAppViewProps {
   whatsappOnline: boolean;
   onSetWhatsappOnline: (status: boolean) => void;
   onPostAlert: (msg: string, type: 'success' | 'warning' | 'error') => void;
+  onSetTab: (tab: string) => void;
 }
 
-export default function WhatsAppView({ 
-  alunos, 
-  mensagens, 
-  onSendMessage, 
-  whatsappOnline, 
+export default function WhatsAppView({
+  alunos,
+  mensagens,
+  onSendMessage,
+  whatsappOnline,
   onSetWhatsappOnline,
-  onPostAlert
+  onPostAlert,
+  onSetTab
 }: WhatsAppViewProps) {
   const [selectedChatStudentId, setSelectedChatStudentId] = useState<string>(alunos[1]?.id || alunos[0]?.id || '');
   const [textInput, setTextInput] = useState('');
@@ -471,12 +468,49 @@ Diretrizes:
         </div>
 
         {/* Interactive Takeover Chat Desk (Column 2 & 3 - Spans 2) */}
+        {alunos.length === 0 ? (
+          /* ── Empty state: no students loaded ── */
+          <div className="lg:col-span-2 bg-white rounded-xl border border-dashed border-gray-200 p-10 shadow-xs flex flex-col items-center justify-center text-center gap-5 min-h-[28rem]">
+            <div className="bg-blue-50 rounded-full p-5">
+              <Users className="h-12 w-12 text-[#03045e]/60" />
+            </div>
+
+            <div className="space-y-2 max-w-sm">
+              <h3 className="text-base font-bold text-gray-800">Nenhum aluno cadastrado</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                O console de WhatsApp fica disponível assim que houver alunos na base de dados.
+                Importe uma planilha ou cadastre um aluno manualmente para começar a usar a automação de cobranças.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3 justify-center mt-2">
+              <button
+                onClick={() => onSetTab('importações')}
+                className="flex items-center gap-2 bg-[#03045e] hover:bg-[#03045e]/90 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition shadow-sm cursor-pointer"
+              >
+                <Upload className="h-4 w-4" />
+                Importar Alunos (Planilha)
+              </button>
+              <button
+                onClick={() => onSetTab('alunos')}
+                className="flex items-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-lg transition cursor-pointer"
+              >
+                <User className="h-4 w-4" />
+                Cadastrar Manualmente
+              </button>
+            </div>
+
+            <p className="text-[10px] text-gray-300 mt-1">
+              Após importar ou cadastrar alunos, esta tela exibirá automaticamente os canais de atendimento.
+            </p>
+          </div>
+        ) : (
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-5 shadow-xs flex flex-col md:flex-row gap-5 h-130">
-          
+
           {/* Active Chats selector List (Inner Left) */}
           <div className="w-full md:w-1/3 border-r border-gray-100 pr-0 md:pr-4 flex flex-col h-full overflow-hidden">
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-50 pb-3 mb-3">Estudantes em Atendimento</h4>
-            
+
             <div className="space-y-1 overflow-y-auto flex-1 pr-1">
               {alunos.map(aluno => {
                 const isSelected = selectedChatStudentId === aluno.id;
@@ -648,6 +682,7 @@ Diretrizes:
           </div>
 
         </div>
+        )} {/* end alunos.length === 0 ternary */}
 
       </div>
     </div>
