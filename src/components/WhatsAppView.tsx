@@ -238,7 +238,7 @@ Diretrizes:
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!textInput.trim() || isSending) return;
+    if (!textInput.trim() || isSending || !selectedStudent) return;
 
     const messageText = textInput.trim();
     setTextInput('');
@@ -499,124 +499,134 @@ Diretrizes:
           {/* Live conversation console & Takeover selector (Inner Right) */}
           <div className="flex-1 flex flex-col justify-between h-full overflow-hidden">
             
-            {/* Conversation Header */}
-            <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-600" />
-                <div>
-                  <p className="text-xs font-bold text-gray-955 text-gray-900 font-sans leading-none">{selectedStudent.nome}</p>
-                  <span className="text-[9px] text-gray-400 font-medium">{selectedStudent.curso}</span>
-                </div>
-              </div>
-
-              {/* Takeover toggle btn */}
-              <button
-                onClick={() => toggleTakeover(selectedStudent.id)}
-                className={`text-[10px] font-bold px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1 ${
-                  humanTakeoverList.includes(selectedStudent.id)
-                    ? 'bg-amber-500 text-white hover:bg-amber-600'
-                    : 'bg-blue-50 text-[#03045e] border border-blue-100 hover:bg-blue-100'
-                }`}
-              >
-                <span>{humanTakeoverList.includes(selectedStudent.id) ? 'Automação Pausada' : 'Assumir Humano'}</span>
-              </button>
-            </div>
-
-            {/* Conversation List logs */}
-            <div className="flex-1 overflow-y-auto py-4 space-y-3 my-2 pr-1 scrollbar-thin flex flex-col">
-              {currentChats.length > 0 ? (
-                currentChats.map((msg) => {
-                  const isRecipient = msg.tipo === 'HUMANO_CLIENTE';
-                  return (
-                    <div 
-                      key={msg.id} 
-                      className={`flex flex-col max-w-[85%] ${isRecipient ? 'self-start' : 'self-end'}`}
-                      style={{ alignSelf: isRecipient ? 'flex-start' : 'flex-end' }}
-                    >
-                      <div className={`p-3 rounded-2xl text-[11px] leading-relaxed font-sans ${
-                        isRecipient 
-                          ? 'bg-slate-100 text-gray-800 rounded-tl-none border border-slate-200/50' 
-                          : msg.tipo === 'SISTEMA'
-                            ? 'bg-orange-50 text-amber-900 border border-orange-100 rounded-tr-none'
-                            : 'bg-[#03045e] text-white rounded-tr-none font-medium'
-                      }`}>
-                        <p>{msg.texto}</p>
-                      </div>
-                      
-                      <div className={`flex items-center gap-1 text-[9px] text-gray-400 mt-1 ${isRecipient ? 'justify-start' : 'justify-end'}`}>
-                        <span>{new Date(msg.dataHora).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
-                        {!isRecipient && (
-                          <span className={`${msg.statusEnvio === 'LIDO' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
-                            {msg.statusEnvio === 'LIDO' ? '✓✓' : '✓'}
-                          </span>
-                        )}
-                        <span className="font-bold lowercase">
-                          ({msg.tipo === 'SISTEMA' ? 'robô' : msg.tipo === 'HUMANO_AGENTE' ? 'humano' : 'aluno'})
-                        </span>
-                      </div>
+            {selectedStudent ? (
+              <>
+                {/* Conversation Header */}
+                <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-600" />
+                    <div>
+                      <p className="text-xs font-bold text-gray-955 text-gray-900 font-sans leading-none">{selectedStudent.nome}</p>
+                      <span className="text-[9px] text-gray-400 font-medium">{selectedStudent.curso}</span>
                     </div>
-                  );
-                })
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 text-xs">
-                  <MessageSquare className="h-8 w-8 text-gray-300 mb-1" />
-                  <p className="font-semibold text-gray-500">Nenhum diálogo ativo com o WhatsApp</p>
-                  <p className="text-[10px] text-gray-400">Clique em "Cobrar" na lista de boletos para inicializar ou envie uma mensagem direta abaixo.</p>
-                </div>
-              )}
-            </div>
+                  </div>
 
-            {/* Simulated sender selector */}
-            {whatsappOnline && (
-              <div className="pb-2 flex justify-between items-center text-[10px] border-t border-gray-50 pt-2.5">
-                <span className="text-gray-400">Modo de Simulação do Teclado:</span>
-                <div className="flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => setSendAsAgent(true)}
-                    className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${sendAsAgent ? 'bg-[#03045e] text-white' : 'bg-gray-100 text-gray-500'}`}
+                  {/* Takeover toggle btn */}
+                  <button
+                    onClick={() => toggleTakeover(selectedStudent.id)}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1 ${
+                      humanTakeoverList.includes(selectedStudent.id)
+                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                        : 'bg-blue-50 text-[#03045e] border border-blue-100 hover:bg-blue-100'
+                    }`}
                   >
-                    Digitar como Atendente
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setSendAsAgent(false)}
-                    className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${!sendAsAgent ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}
-                  >
-                    Simular como Aluno (Sacado)
+                    <span>{humanTakeoverList.includes(selectedStudent.id) ? 'Automação Pausada' : 'Assumir Humano'}</span>
                   </button>
                 </div>
+
+                {/* Conversation List logs */}
+                <div className="flex-1 overflow-y-auto py-4 space-y-3 my-2 pr-1 scrollbar-thin flex flex-col">
+                  {currentChats.length > 0 ? (
+                    currentChats.map((msg) => {
+                      const isRecipient = msg.tipo === 'HUMANO_CLIENTE';
+                      return (
+                        <div 
+                          key={msg.id} 
+                          className={`flex flex-col max-w-[85%] ${isRecipient ? 'self-start' : 'self-end'}`}
+                          style={{ alignSelf: isRecipient ? 'flex-start' : 'flex-end' }}
+                        >
+                          <div className={`p-3 rounded-2xl text-[11px] leading-relaxed font-sans ${
+                            isRecipient 
+                              ? 'bg-slate-100 text-gray-800 rounded-tl-none border border-slate-200/50' 
+                              : msg.tipo === 'SISTEMA'
+                                ? 'bg-orange-50 text-amber-900 border border-orange-100 rounded-tr-none'
+                                : 'bg-[#03045e] text-white rounded-tr-none font-medium'
+                          }`}>
+                            <p>{msg.texto}</p>
+                          </div>
+                          
+                          <div className={`flex items-center gap-1 text-[9px] text-gray-400 mt-1 ${isRecipient ? 'justify-start' : 'justify-end'}`}>
+                            <span>{new Date(msg.dataHora).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+                            {!isRecipient && (
+                              <span className={`${msg.statusEnvio === 'LIDO' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
+                                {msg.statusEnvio === 'LIDO' ? '✓✓' : '✓'}
+                              </span>
+                            )}
+                            <span className="font-bold lowercase">
+                              ({msg.tipo === 'SISTEMA' ? 'robô' : msg.tipo === 'HUMANO_AGENTE' ? 'humano' : 'aluno'})
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 text-xs">
+                      <MessageSquare className="h-8 w-8 text-gray-300 mb-1" />
+                      <p className="font-semibold text-gray-500">Nenhum diálogo ativo com o WhatsApp</p>
+                      <p className="text-[10px] text-gray-400">Clique em "Cobrar" na lista de boletos para inicializar ou envie uma mensagem direta abaixo.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Simulated sender selector */}
+                {whatsappOnline && (
+                  <div className="pb-2 flex justify-between items-center text-[10px] border-t border-gray-50 pt-2.5">
+                    <span className="text-gray-400">Modo de Simulação do Teclado:</span>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setSendAsAgent(true)}
+                        className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${sendAsAgent ? 'bg-[#03045e] text-white' : 'bg-gray-100 text-gray-500'}`}
+                      >
+                        Digitar como Atendente
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setSendAsAgent(false)}
+                        className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${!sendAsAgent ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+                      >
+                        Simular como Aluno (Sacado)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Prompt input field form */}
+                <form onSubmit={handleSend} className="pt-2 flex gap-2">
+                  <input 
+                    type="text" 
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder={
+                      !whatsappOnline 
+                        ? "Conecte a Evolution API para liberar digitação..." 
+                        : sendAsAgent 
+                          ? "Escreva como atendente humano (o aluno responderá via IA)..." 
+                          : "Escreva como o aluno (o robô Sentia responderá via IA)..."
+                    }
+                    disabled={!whatsappOnline || isSending}
+                    className="flex-1 bg-gray-50 border border-gray-205 border-gray-200 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-[#03045e] focus:bg-white focus:outline-hidden disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!whatsappOnline || !textInput.trim() || isSending}
+                    className="bg-[#03045e] hover:bg-blue-900 text-white p-2.5 rounded-lg transition shrink-0 cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-[40px]"
+                  >
+                    {isSending ? (
+                      <RefreshCw className="h-4 w-4 animate-spin text-white" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center text-gray-405 text-gray-400 text-xs">
+                <User className="h-10 w-10 text-gray-300 mb-2" />
+                <p className="font-semibold text-gray-500">Nenhum aluno selecionado</p>
+                <p className="text-[10px] text-gray-400">Cadastre ou importe alunos para iniciar atendimentos via WhatsApp.</p>
               </div>
             )}
-
-            {/* Prompt input field form */}
-            <form onSubmit={handleSend} className="pt-2 flex gap-2">
-              <input 
-                type="text" 
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder={
-                  !whatsappOnline 
-                    ? "Conecte a Evolution API para liberar digitação..." 
-                    : sendAsAgent 
-                      ? "Escreva como atendente humano (o aluno responderá via IA)..." 
-                      : "Escreva como o aluno (o robô Sentia responderá via IA)..."
-                }
-                disabled={!whatsappOnline || isSending}
-                className="flex-1 bg-gray-50 border border-gray-205 border-gray-200 rounded-lg p-2.5 text-xs focus:ring-1 focus:ring-[#03045e] focus:bg-white focus:outline-hidden disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={!whatsappOnline || !textInput.trim() || isSending}
-                className="bg-[#03045e] hover:bg-blue-900 text-white p-2.5 rounded-lg transition shrink-0 cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-[40px]"
-              >
-                {isSending ? (
-                  <RefreshCw className="h-4 w-4 animate-spin text-white" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </button>
-            </form>
 
           </div>
 
