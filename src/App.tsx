@@ -205,7 +205,7 @@ export default function App() {
     if (!isUsingApi) return;
     
     const pollUpdates = async () => {
-      // If client has pending local modifications that are not yet saved to the server, skip polling
+      // If client has pending local modifications or a reset/clear is in progress, skip polling
       if (pendingSyncRef.current || isResettingRef.current) {
         return;
       }
@@ -213,6 +213,9 @@ export default function App() {
       try {
         const response = await fetch('/api/db');
         if (response.ok) {
+          // Re-check after await in case a reset/clear started while we were fetching
+          if (isResettingRef.current) return;
+
           const data = await response.json();
           skipSyncRef.current = true;
           if (data.alunos) setAlunos(data.alunos);
@@ -246,6 +249,13 @@ export default function App() {
     pendingSyncRef.current = true; // Block polling while sync is pending
 
     const syncToBackend = async () => {
+      // CRITICAL: Re-check isResettingRef right before sending data.
+      // This prevents already-scheduled timeouts from overwriting a cleared database.
+      if (isResettingRef.current) {
+        pendingSyncRef.current = false;
+        return;
+      }
+
       try {
         const response = await fetch('/api/save-all', {
           method: 'POST',
@@ -725,20 +735,6 @@ export default function App() {
     try {
       const response = await fetch('/api/reset', { method: 'POST' });
       if (response.ok) {
-        const result = await response.json();
-        // Hydrate frontend state
-        if (result.data) {
-          const { alunos, boletos, mensagens, regras, crmConfig, logs, polos, users } = result.data;
-          setAlunos(alunos);
-          setBoletos(boletos);
-          setMensagens(mensagens);
-          setRegras(regras);
-          setCrmConfig(crmConfig);
-          setLogs(logs);
-          if (polos) setPolos(polos);
-          if (users) setUsers(users);
-        }
-        
         // Remove localStorage items to ensure clean state
         localStorage.removeItem('sentidos_alunos');
         localStorage.removeItem('sentidos_boletos');
@@ -749,12 +745,19 @@ export default function App() {
         localStorage.removeItem('sentidos_polos');
         localStorage.removeItem('sentidos_users');
         
-        postToastAlert('Banco de dados local (JSON) redefinido para o padrão com sucesso!', 'success');
+        postToastAlert('Banco de dados redefinido para o padrão! Recarregando...', 'success');
+
+        // Force full page reload to guarantee clean state
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+        return;
       } else {
+        isResettingRef.current = false;
         postToastAlert('O servidor de backend respondeu com erro ao redefinir o banco.', 'error');
       }
     } catch (err) {
-      // Offline fallback: reset to initial files in localStorage
+      // Offline fallback: reset localStorage
       localStorage.removeItem('sentidos_alunos');
       localStorage.removeItem('sentidos_boletos');
       localStorage.removeItem('sentidos_mensagens');
@@ -764,20 +767,12 @@ export default function App() {
       localStorage.removeItem('sentidos_polos');
       localStorage.removeItem('sentidos_users');
 
-      setAlunos(INITIAL_ALUNOS);
-      setBoletos(INITIAL_BOLETOS);
-      setMensagens(INITIAL_WHATSAPP_MENSAGENS);
-      setRegras(INITIAL_COBRANCA_REGRAS);
-      setCrmConfig(INITIAL_CRM_CONFIG);
-      setLogs(INITIAL_LOGS_ATIVIDADE);
-      setPolos(INITIAL_POLOS);
-      setUsers(INITIAL_USERS);
+      postToastAlert('Banco offline redefinido para o padrão! Recarregando...', 'success');
 
-      postToastAlert('Banco offline (localStorage) redefinido para o padrão!', 'success');
-    } finally {
       setTimeout(() => {
-        isResettingRef.current = false;
-      }, 1000);
+        window.location.reload();
+      }, 800);
+      return;
     }
   };
 
@@ -787,24 +782,23 @@ export default function App() {
     try {
       const response = await fetch('/api/clear-db', { method: 'POST' });
       if (response.ok) {
-        const result = await response.json();
-        // Hydrate empty state
-        skipSyncRef.current = true;
-        setAlunos([]);
-        setBoletos([]);
-        setMensagens([]);
-        if (result.data && result.data.logs) {
-          setLogs(result.data.logs);
-        }
-        
-        // Clean localStorage items
+        // Clean localStorage items FIRST to prevent any restore from local cache
         localStorage.removeItem('sentidos_alunos');
         localStorage.removeItem('sentidos_boletos');
         localStorage.removeItem('sentidos_mensagens');
         localStorage.removeItem('sentidos_logs');
-        
-        postToastAlert('Banco de dados limpo para produção com sucesso! Modelos de réguas e chaves de API foram preservados.', 'success');
+
+        postToastAlert('Banco de dados limpo para produção! Recarregando...', 'success');
+
+        // Force full page reload after a brief delay to guarantee clean state.
+        // This eliminates any possibility of stale in-memory React state being
+        // re-synced back to the server.
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+        return; // Don't continue, page will reload
       } else {
+        isResettingRef.current = false;
         postToastAlert('O servidor respondeu com erro ao limpar o banco de dados.', 'error');
       }
     } catch (err) {
@@ -814,26 +808,12 @@ export default function App() {
       localStorage.removeItem('sentidos_mensagens');
       localStorage.removeItem('sentidos_logs');
 
-      skipSyncRef.current = true;
-      setAlunos([]);
-      setBoletos([]);
-      setMensagens([]);
-      setLogs([
-        {
-          id: `log-${Date.now()}`,
-          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          tipo: 'USUARIO',
-          usuario: 'Sistema',
-          detalhe: 'Banco de dados local limpo para início de produção com dados reais.',
-          sucesso: true
-        }
-      ]);
+      postToastAlert('Banco offline (localStorage) limpo para produção! Recarregando...', 'success');
 
-      postToastAlert('Banco offline (localStorage) limpo para produção!', 'success');
-    } finally {
       setTimeout(() => {
-        isResettingRef.current = false;
-      }, 1000);
+        window.location.reload();
+      }, 800);
+      return;
     }
   };
 
