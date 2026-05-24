@@ -3,7 +3,6 @@ version: '3.8'
 services:
   sentidos_db:
     image: postgres:15-alpine
-    container_name: sentidos_db
     restart: always
     environment:
       POSTGRES_DB: sentidos_cobrancas
@@ -16,7 +15,6 @@ services:
 
   sentidos_cobrancas:
     build: .
-    container_name: sentidos_cobrancas
     restart: always
     environment:
       - DATABASE_URL=postgresql://sentidos_user:sentidos_password@sentidos_db:5432/sentidos_cobrancas
