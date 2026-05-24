@@ -373,6 +373,17 @@ app.post('/api/whatsapp/webhook', (req, res) => {
 
 
 
+// Serve React frontend static files in production
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  // Fallback to index.html for React SPA routing
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+  console.log(`[Sentidos Cobranças] Servindo arquivos estáticos de: ${distPath}`);
+}
+
 app.listen(PORT, () => {
   console.log(`[Sentidos Cobranças] Servidor rodando na porta ${PORT}`);
   console.log(`[Sentidos Cobranças] Banco de dados em arquivo: ${DB_PATH}`);
