@@ -166,6 +166,8 @@ export default function App() {
   const skipSyncRef = useRef(false);
   // Ref to block background polling when a local change is pending sync to the backend
   const pendingSyncRef = useRef(false);
+  // Ref to prevent sync when resetting/clearing database
+  const isResettingRef = useRef(false);
 
   // Initial Fetch from backend DB with LocalStorage fallback
   useEffect(() => {
@@ -204,7 +206,7 @@ export default function App() {
     
     const pollUpdates = async () => {
       // If client has pending local modifications that are not yet saved to the server, skip polling
-      if (pendingSyncRef.current) {
+      if (pendingSyncRef.current || isResettingRef.current) {
         return;
       }
 
@@ -234,6 +236,7 @@ export default function App() {
   // Sync to Backend JSON DB
   useEffect(() => {
     if (!dbLoaded || !isUsingApi) return;
+    if (isResettingRef.current) return;
 
     if (skipSyncRef.current) {
       skipSyncRef.current = false;
@@ -718,6 +721,7 @@ export default function App() {
 
   // Operation 7: Reset Database in server OR local storage
   const handleResetDatabase = async () => {
+    isResettingRef.current = true;
     try {
       const response = await fetch('/api/reset', { method: 'POST' });
       if (response.ok) {
@@ -770,11 +774,16 @@ export default function App() {
       setUsers(INITIAL_USERS);
 
       postToastAlert('Banco offline (localStorage) redefinido para o padrão!', 'success');
+    } finally {
+      setTimeout(() => {
+        isResettingRef.current = false;
+      }, 1000);
     }
   };
 
   // Operation 7.5: Clear Database for Production (wipe students, bills, logs, messages)
   const handleClearDatabase = async () => {
+    isResettingRef.current = true;
     try {
       const response = await fetch('/api/clear-db', { method: 'POST' });
       if (response.ok) {
@@ -821,6 +830,10 @@ export default function App() {
       ]);
 
       postToastAlert('Banco offline (localStorage) limpo para produção!', 'success');
+    } finally {
+      setTimeout(() => {
+        isResettingRef.current = false;
+      }, 1000);
     }
   };
 

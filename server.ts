@@ -141,6 +141,7 @@ app.get('/api/db', (req, res) => {
 
 // Reset database
 app.post('/api/reset', (req, res) => {
+  console.log('[Sentidos Cobranças] Recebida requisição /api/reset. Reiniciando banco de dados para os valores padrão...');
   const initial = getInitialData();
   writeDB(initial);
   res.json({ success: true, message: 'Banco de dados reiniciado e limpo com sucesso!', data: initial });
@@ -157,6 +158,7 @@ app.post('/api/save-all', (req, res) => {
   if (!hasRequired) {
     return res.status(400).json({ success: false, message: 'Dados incompletos para persistência' });
   }
+  console.log(`[Sentidos Cobranças] Recebida requisição /api/save-all. Salvando ${data.alunos.length} alunos, ${data.boletos.length} boletos no arquivo database.json...`);
   writeDB(data);
   res.json({ success: true, message: 'Banco de dados salvo com sucesso!' });
 });
@@ -391,6 +393,7 @@ app.post('/api/whatsapp/webhook', (req, res) => {
 
 // Clean database for production (keep regras, crmConfig, and polos)
 app.post('/api/clear-db', (req, res) => {
+  console.log('[Sentidos Cobranças] Recebida requisição /api/clear-db. Limpando dados de alunos, boletos e mensagens para produção...');
   const db = readDB();
   db.alunos = [];
   db.boletos = [];
