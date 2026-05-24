@@ -20,8 +20,11 @@ jobs:
             # Entra na pasta do projeto na VPS
             cd isentidoscobranca
             
-            # Puxa as atualizações do GitHub
-            git pull origin main
+            # Garante que a VPS fique exatamente na versão publicada no GitHub
+            git fetch origin main
+            git reset --hard origin/main
             
-            # Reconstrói e reinicia os containers
-            docker compose up -d --build
+            # Reconstrói o app sem cache e força recriação para publicar o dist novo
+            docker compose build --no-cache sentidos_cobrancas
+            docker compose up -d --force-recreate sentidos_cobrancas
+            docker compose ps
