@@ -51,6 +51,12 @@ import {
   INITIAL_USERS
 } from './mockData';
 
+const isSameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+const setIfChanged = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, nextValue: T) => {
+  setter(prev => isSameJson(prev, nextValue) ? prev : nextValue);
+};
+
 export default function App() {
   // Session User State
   const [userEmail, setUserEmail] = useState<string | null>(() => {
@@ -177,14 +183,14 @@ export default function App() {
         if (response.ok) {
           const data = await response.json();
           skipSyncRef.current = true;
-          if (data.alunos) setAlunos(data.alunos);
-          if (data.boletos) setBoletos(data.boletos);
-          if (data.mensagens) setMensagens(data.mensagens);
-          if (data.regras) setRegras(data.regras);
-          if (data.crmConfig) setCrmConfig(data.crmConfig);
-          if (data.logs) setLogs(data.logs);
-          if (data.polos) setPolos(data.polos);
-          if (data.users) setUsers(data.users);
+          if (data.alunos) setIfChanged(setAlunos, data.alunos);
+          if (data.boletos) setIfChanged(setBoletos, data.boletos);
+          if (data.mensagens) setIfChanged(setMensagens, data.mensagens);
+          if (data.regras) setIfChanged(setRegras, data.regras);
+          if (data.crmConfig) setIfChanged(setCrmConfig, data.crmConfig);
+          if (data.logs) setIfChanged(setLogs, data.logs);
+          if (data.polos) setIfChanged(setPolos, data.polos);
+          if (data.users) setIfChanged(setUsers, data.users);
           
           setIsUsingApi(true);
           console.log('[Sentidos Cobranças] Banco de dados carregado com sucesso do backend.');
@@ -218,14 +224,14 @@ export default function App() {
 
           const data = await response.json();
           skipSyncRef.current = true;
-          if (data.alunos) setAlunos(data.alunos);
-          if (data.boletos) setBoletos(data.boletos);
-          if (data.mensagens) setMensagens(data.mensagens);
-          if (data.regras) setRegras(data.regras);
-          if (data.crmConfig) setCrmConfig(data.crmConfig);
-          if (data.logs) setLogs(data.logs);
-          if (data.polos) setPolos(data.polos);
-          if (data.users) setUsers(data.users);
+          if (data.alunos) setIfChanged(setAlunos, data.alunos);
+          if (data.boletos) setIfChanged(setBoletos, data.boletos);
+          if (data.mensagens) setIfChanged(setMensagens, data.mensagens);
+          if (data.regras) setIfChanged(setRegras, data.regras);
+          if (data.crmConfig) setIfChanged(setCrmConfig, data.crmConfig);
+          if (data.logs) setIfChanged(setLogs, data.logs);
+          if (data.polos) setIfChanged(setPolos, data.polos);
+          if (data.users) setIfChanged(setUsers, data.users);
         }
       } catch (err) {
         console.warn('[Sentidos Cobranças] Erro ao buscar atualizações em segundo plano:', err);
@@ -329,7 +335,8 @@ export default function App() {
   // State calculations helper: Recalculate student pending totals when boletos values shift!
   useEffect(() => {
     setAlunos(prevAlunos => {
-      return prevAlunos.map(student => {
+      let hasChanges = false;
+      const nextAlunos = prevAlunos.map(student => {
         const unpaidBills = boletos.filter(b => b.alunoId === student.id && b.status !== 'PAGO');
         const pendingSum = unpaidBills.reduce((acc, curr) => acc + curr.valor, 0);
         
@@ -339,12 +346,19 @@ export default function App() {
           financialStatus = hasOverdue ? 'INADIMPLENTE' : 'PENDENTE';
         }
 
+        if (student.valorPendente === pendingSum && student.statusFinanceiro === financialStatus) {
+          return student;
+        }
+
+        hasChanges = true;
         return {
           ...student,
           valorPendente: pendingSum,
           statusFinanceiro: financialStatus
         };
       });
+
+      return hasChanges ? nextAlunos : prevAlunos;
     });
   }, [boletos]);
 
