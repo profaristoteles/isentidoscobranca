@@ -1,0 +1,6 @@
+{
+  "name": "Sentidos Cobranças",
+  "description": "Sistema de gestão e automação de cobranças acadêmicas para o Instituto Sentidos e FAEPI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
