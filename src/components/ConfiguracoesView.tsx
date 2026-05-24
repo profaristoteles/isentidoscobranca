@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Aluno, Colaborador } from '../types';
 import { checkConnectionStatus } from '../services/whatsappService';
+import { safeGetItem, safeSetItem } from '../utils/storage';
 
 
 interface ConfiguracoesViewProps {
@@ -72,41 +73,41 @@ export default function ConfiguracoesView({
   const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS'>('USERS');
   
   const [activeProvider, setActiveProvider] = useState(() => {
-    return localStorage.getItem('sentidos_active_provider') || 'gemini';
+    return safeGetItem('sentidos_active_provider') || 'gemini';
   });
   const [geminiKey, setGeminiKey] = useState(() => {
-    return localStorage.getItem('sentidos_gemini_api_key') || '';
+    return safeGetItem('sentidos_gemini_api_key') || '';
   });
   const [openaiKey, setOpenaiKey] = useState(() => {
-    return localStorage.getItem('sentidos_openai_api_key') || '';
+    return safeGetItem('sentidos_openai_api_key') || '';
   });
   const [openaiModel, setOpenaiModel] = useState(() => {
-    return localStorage.getItem('sentidos_openai_model') || 'gpt-4o-mini';
+    return safeGetItem('sentidos_openai_model') || 'gpt-4o-mini';
   });
   const [groqKey, setGroqKey] = useState(() => {
-    return localStorage.getItem('sentidos_groq_api_key') || '';
+    return safeGetItem('sentidos_groq_api_key') || '';
   });
   const [groqModel, setGroqModel] = useState(() => {
-    return localStorage.getItem('sentidos_groq_model') || 'llama-3.3-70b-specdec';
+    return safeGetItem('sentidos_groq_model') || 'llama-3.3-70b-specdec';
   });
   const [openrouterKey, setOpenrouterKey] = useState(() => {
-    return localStorage.getItem('sentidos_openrouter_api_key') || '';
+    return safeGetItem('sentidos_openrouter_api_key') || '';
   });
   const [openrouterModel, setOpenrouterModel] = useState(() => {
-    return localStorage.getItem('sentidos_openrouter_model') || 'google/gemini-2.5-flash';
+    return safeGetItem('sentidos_openrouter_model') || 'google/gemini-2.5-flash';
   });
 
   const [evolutionUrl, setEvolutionUrl] = useState(() => {
-    return localStorage.getItem('sentidos_evolution_url') || '';
+    return safeGetItem('sentidos_evolution_url') || '';
   });
   const [evolutionGlobalToken, setEvolutionGlobalToken] = useState(() => {
-    return localStorage.getItem('sentidos_evolution_global_token') || '';
+    return safeGetItem('sentidos_evolution_global_token') || '';
   });
   const [evolutionInstance, setEvolutionInstance] = useState(() => {
-    return localStorage.getItem('sentidos_evolution_instance') || '';
+    return safeGetItem('sentidos_evolution_instance') || '';
   });
   const [evolutionInstanceToken, setEvolutionInstanceToken] = useState(() => {
-    return localStorage.getItem('sentidos_evolution_instance_token') || '';
+    return safeGetItem('sentidos_evolution_instance_token') || '';
   });
   const [checkingConnection, setCheckingConnection] = useState(false);
 
@@ -117,10 +118,10 @@ export default function ConfiguracoesView({
     }
     setCheckingConnection(true);
     // Temp save parameters in localStorage so connection check reads current inputs
-    localStorage.setItem('sentidos_evolution_url', evolutionUrl.trim());
-    localStorage.setItem('sentidos_evolution_global_token', evolutionGlobalToken.trim());
-    localStorage.setItem('sentidos_evolution_instance', evolutionInstance.trim());
-    localStorage.setItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
+    safeSetItem('sentidos_evolution_url', evolutionUrl.trim());
+    safeSetItem('sentidos_evolution_global_token', evolutionGlobalToken.trim());
+    safeSetItem('sentidos_evolution_instance', evolutionInstance.trim());
+    safeSetItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
 
     try {
       const res = await checkConnectionStatus();
@@ -741,7 +742,7 @@ export default function ConfiguracoesView({
                     onChange={(e) => {
                       const prov = e.target.value;
                       setActiveProvider(prov);
-                      localStorage.setItem('sentidos_ai_provider', prov);
+                      safeSetItem('sentidos_ai_provider', prov);
                       onPostAlert(`Provedor de IA ativo alterado para ${prov.toUpperCase()}!`, 'success');
                     }}
                     className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-[#03045e] focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
@@ -780,7 +781,7 @@ export default function ConfiguracoesView({
                     />
                     <button
                       onClick={() => {
-                        localStorage.setItem('sentidos_gemini_api_key', geminiKey);
+                        safeSetItem('sentidos_gemini_api_key', geminiKey);
                         onPostAlert('Chave de API do Gemini salva com sucesso!', 'success');
                       }}
                       className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-4 py-2 rounded-lg text-xs transition cursor-pointer"
@@ -830,8 +831,8 @@ export default function ConfiguracoesView({
                   <div className="text-right">
                     <button
                       onClick={() => {
-                        localStorage.setItem('sentidos_openai_api_key', openaiKey);
-                        localStorage.setItem('sentidos_openai_model', openaiModel);
+                        safeSetItem('sentidos_openai_api_key', openaiKey);
+                        safeSetItem('sentidos_openai_model', openaiModel);
                         onPostAlert('Configurações da OpenAI salvas com sucesso!', 'success');
                       }}
                       className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-4 py-2 rounded-lg text-xs transition cursor-pointer"
@@ -881,8 +882,8 @@ export default function ConfiguracoesView({
                   <div className="text-right">
                     <button
                       onClick={() => {
-                        localStorage.setItem('sentidos_groq_api_key', groqKey);
-                        localStorage.setItem('sentidos_groq_model', groqModel);
+                        safeSetItem('sentidos_groq_api_key', groqKey);
+                        safeSetItem('sentidos_groq_model', groqModel);
                         onPostAlert('Configurações da Groq salvas com sucesso!', 'success');
                       }}
                       className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-4 py-2 rounded-lg text-xs transition cursor-pointer"
@@ -932,8 +933,8 @@ export default function ConfiguracoesView({
                   <div className="text-right">
                     <button
                       onClick={() => {
-                        localStorage.setItem('sentidos_openrouter_api_key', openrouterKey);
-                        localStorage.setItem('sentidos_openrouter_model', openrouterModel);
+                        safeSetItem('sentidos_openrouter_api_key', openrouterKey);
+                        safeSetItem('sentidos_openrouter_model', openrouterModel);
                         onPostAlert('Configurações da OpenRouter salvas com sucesso!', 'success');
                       }}
                       className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-4 py-2 rounded-lg text-xs transition cursor-pointer"
@@ -1024,10 +1025,10 @@ export default function ConfiguracoesView({
                     <button
                       type="button"
                       onClick={() => {
-                        localStorage.setItem('sentidos_evolution_url', evolutionUrl.trim());
-                        localStorage.setItem('sentidos_evolution_global_token', evolutionGlobalToken.trim());
-                        localStorage.setItem('sentidos_evolution_instance', evolutionInstance.trim());
-                        localStorage.setItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
+                        safeSetItem('sentidos_evolution_url', evolutionUrl.trim());
+                        safeSetItem('sentidos_evolution_global_token', evolutionGlobalToken.trim());
+                        safeSetItem('sentidos_evolution_instance', evolutionInstance.trim());
+                        safeSetItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
                         onPostAlert('Configurações da Evolution API salvas com sucesso!', 'success');
                       }}
                       className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-5 py-2 rounded-lg text-xs transition cursor-pointer"

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai/web';
+import { safeGetItem } from '../utils/storage';
 
 export type AIProvider = 'gemini' | 'openai' | 'groq' | 'openrouter';
 
@@ -15,14 +16,14 @@ export interface AISettings {
 
 export function getAISettings(): AISettings {
   return {
-    provider: (localStorage.getItem('sentidos_ai_provider') as AIProvider) || 'gemini',
-    geminiKey: localStorage.getItem('sentidos_gemini_api_key') || '',
-    openaiKey: localStorage.getItem('sentidos_openai_api_key') || '',
-    openaiModel: localStorage.getItem('sentidos_openai_model') || 'gpt-4o-mini',
-    groqKey: localStorage.getItem('sentidos_groq_api_key') || '',
-    groqModel: localStorage.getItem('sentidos_groq_model') || 'llama-3.3-70b-specdec',
-    openrouterKey: localStorage.getItem('sentidos_openrouter_api_key') || '',
-    openrouterModel: localStorage.getItem('sentidos_openrouter_model') || 'google/gemini-2.5-flash',
+    provider: (safeGetItem('sentidos_ai_provider') as AIProvider) || 'gemini',
+    geminiKey: safeGetItem('sentidos_gemini_api_key') || '',
+    openaiKey: safeGetItem('sentidos_openai_api_key') || '',
+    openaiModel: safeGetItem('sentidos_openai_model') || 'gpt-4o-mini',
+    groqKey: safeGetItem('sentidos_groq_api_key') || '',
+    groqModel: safeGetItem('sentidos_groq_model') || 'llama-3.3-70b-specdec',
+    openrouterKey: safeGetItem('sentidos_openrouter_api_key') || '',
+    openrouterModel: safeGetItem('sentidos_openrouter_model') || 'google/gemini-2.5-flash',
   };
 }
 

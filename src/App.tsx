@@ -29,6 +29,7 @@ import {
   checkConnectionStatus, 
   sendTextMessage 
 } from './services/whatsappService';
+import { safeGetItem, safeParseJson, safeRemoveItem, safeSetItem } from './utils/storage';
 
 // Models & Dummy Dataset loaders
 import { 
@@ -60,7 +61,7 @@ const setIfChanged = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, nextV
 export default function App() {
   // Session User State
   const [userEmail, setUserEmail] = useState<string | null>(() => {
-    return localStorage.getItem('sentidos_user_email');
+    return safeGetItem('sentidos_user_email');
   });
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -71,101 +72,61 @@ export default function App() {
 
   // States database with local storage persistence
   const [polos, setPolos] = useState<string[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_polos');
-      return local ? JSON.parse(local) : INITIAL_POLOS;
-    } catch {
-      return INITIAL_POLOS;
-    }
+    return safeParseJson(safeGetItem('sentidos_polos'), INITIAL_POLOS);
   });
   const [alunos, setAlunos] = useState<Aluno[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_alunos');
-      return local ? JSON.parse(local) : INITIAL_ALUNOS;
-    } catch {
-      return INITIAL_ALUNOS;
-    }
+    return safeParseJson(safeGetItem('sentidos_alunos'), INITIAL_ALUNOS);
   });
   const [boletos, setBoletos] = useState<Boleto[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_boletos');
-      return local ? JSON.parse(local) : INITIAL_BOLETOS;
-    } catch {
-      return INITIAL_BOLETOS;
-    }
+    return safeParseJson(safeGetItem('sentidos_boletos'), INITIAL_BOLETOS);
   });
   const [mensagens, setMensagens] = useState<WhatsAppMensagem[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_mensagens');
-      return local ? JSON.parse(local) : INITIAL_WHATSAPP_MENSAGENS;
-    } catch {
-      return INITIAL_WHATSAPP_MENSAGENS;
-    }
+    return safeParseJson(safeGetItem('sentidos_mensagens'), INITIAL_WHATSAPP_MENSAGENS);
   });
   const [regras, setRegras] = useState<CobrancaRegra[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_regras');
-      return local ? JSON.parse(local) : INITIAL_COBRANCA_REGRAS;
-    } catch {
-      return INITIAL_COBRANCA_REGRAS;
-    }
+    return safeParseJson(safeGetItem('sentidos_regras'), INITIAL_COBRANCA_REGRAS);
   });
   const [crmConfig, setCrmConfig] = useState<CrmConfig>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_crmConfig');
-      return local ? JSON.parse(local) : INITIAL_CRM_CONFIG;
-    } catch {
-      return INITIAL_CRM_CONFIG;
-    }
+    return safeParseJson(safeGetItem('sentidos_crmConfig'), INITIAL_CRM_CONFIG);
   });
   const [logs, setLogs] = useState<LogAtividade[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_logs');
-      return local ? JSON.parse(local) : INITIAL_LOGS_ATIVIDADE;
-    } catch {
-      return INITIAL_LOGS_ATIVIDADE;
-    }
+    return safeParseJson(safeGetItem('sentidos_logs'), INITIAL_LOGS_ATIVIDADE);
   });
   const [users, setUsers] = useState<Colaborador[]>(() => {
-    try {
-      const local = localStorage.getItem('sentidos_users');
-      return local ? JSON.parse(local) : INITIAL_USERS;
-    } catch {
-      return INITIAL_USERS;
-    }
+    return safeParseJson(safeGetItem('sentidos_users'), INITIAL_USERS);
   });
 
   // LocalStorage sync effects
   useEffect(() => {
-    localStorage.setItem('sentidos_polos', JSON.stringify(polos));
+    safeSetItem('sentidos_polos', JSON.stringify(polos));
   }, [polos]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_alunos', JSON.stringify(alunos));
+    safeSetItem('sentidos_alunos', JSON.stringify(alunos));
   }, [alunos]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_boletos', JSON.stringify(boletos));
+    safeSetItem('sentidos_boletos', JSON.stringify(boletos));
   }, [boletos]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_mensagens', JSON.stringify(mensagens));
+    safeSetItem('sentidos_mensagens', JSON.stringify(mensagens));
   }, [mensagens]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_regras', JSON.stringify(regras));
+    safeSetItem('sentidos_regras', JSON.stringify(regras));
   }, [regras]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_crmConfig', JSON.stringify(crmConfig));
+    safeSetItem('sentidos_crmConfig', JSON.stringify(crmConfig));
   }, [crmConfig]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_logs', JSON.stringify(logs));
+    safeSetItem('sentidos_logs', JSON.stringify(logs));
   }, [logs]);
 
   useEffect(() => {
-    localStorage.setItem('sentidos_users', JSON.stringify(users));
+    safeSetItem('sentidos_users', JSON.stringify(users));
   }, [users]);
 
   // Ref to prevent sync loop when polling updates from backend
@@ -365,15 +326,15 @@ export default function App() {
   // Auth triggers
   const handleLogin = (email: string) => {
     setUserEmail(email);
-    localStorage.setItem('sentidos_user_email', email);
+    safeSetItem('sentidos_user_email', email);
     setCurrentTab('dashboard');
     postToastAlert(`Bem-vindo de volta! Sessão iniciada como ${email}`, 'success');
   };
 
   const handleLogout = () => {
     setUserEmail(null);
-    localStorage.removeItem('sentidos_user_email');
-    localStorage.removeItem('sentidos_auth_token');
+    safeRemoveItem('sentidos_user_email');
+    safeRemoveItem('sentidos_auth_token');
     postToastAlert('Sessão encerrada com segurança.', 'warning');
   };
 
@@ -750,14 +711,14 @@ export default function App() {
       const response = await fetch('/api/reset', { method: 'POST' });
       if (response.ok) {
         // Remove localStorage items to ensure clean state
-        localStorage.removeItem('sentidos_alunos');
-        localStorage.removeItem('sentidos_boletos');
-        localStorage.removeItem('sentidos_mensagens');
-        localStorage.removeItem('sentidos_regras');
-        localStorage.removeItem('sentidos_crmConfig');
-        localStorage.removeItem('sentidos_logs');
-        localStorage.removeItem('sentidos_polos');
-        localStorage.removeItem('sentidos_users');
+        safeRemoveItem('sentidos_alunos');
+        safeRemoveItem('sentidos_boletos');
+        safeRemoveItem('sentidos_mensagens');
+        safeRemoveItem('sentidos_regras');
+        safeRemoveItem('sentidos_crmConfig');
+        safeRemoveItem('sentidos_logs');
+        safeRemoveItem('sentidos_polos');
+        safeRemoveItem('sentidos_users');
         
         postToastAlert('Banco de dados redefinido para o padrão! Recarregando...', 'success');
 
@@ -772,14 +733,14 @@ export default function App() {
       }
     } catch (err) {
       // Offline fallback: reset localStorage
-      localStorage.removeItem('sentidos_alunos');
-      localStorage.removeItem('sentidos_boletos');
-      localStorage.removeItem('sentidos_mensagens');
-      localStorage.removeItem('sentidos_regras');
-      localStorage.removeItem('sentidos_crmConfig');
-      localStorage.removeItem('sentidos_logs');
-      localStorage.removeItem('sentidos_polos');
-      localStorage.removeItem('sentidos_users');
+      safeRemoveItem('sentidos_alunos');
+      safeRemoveItem('sentidos_boletos');
+      safeRemoveItem('sentidos_mensagens');
+      safeRemoveItem('sentidos_regras');
+      safeRemoveItem('sentidos_crmConfig');
+      safeRemoveItem('sentidos_logs');
+      safeRemoveItem('sentidos_polos');
+      safeRemoveItem('sentidos_users');
 
       postToastAlert('Banco offline redefinido para o padrão! Recarregando...', 'success');
 
@@ -797,10 +758,10 @@ export default function App() {
       const response = await fetch('/api/clear-db', { method: 'POST' });
       if (response.ok) {
         // Clean localStorage items FIRST to prevent any restore from local cache
-        localStorage.removeItem('sentidos_alunos');
-        localStorage.removeItem('sentidos_boletos');
-        localStorage.removeItem('sentidos_mensagens');
-        localStorage.removeItem('sentidos_logs');
+        safeRemoveItem('sentidos_alunos');
+        safeRemoveItem('sentidos_boletos');
+        safeRemoveItem('sentidos_mensagens');
+        safeRemoveItem('sentidos_logs');
 
         postToastAlert('Banco de dados limpo para produção! Recarregando...', 'success');
 
@@ -817,10 +778,10 @@ export default function App() {
       }
     } catch (err) {
       // Offline fallback: wipe local storage
-      localStorage.removeItem('sentidos_alunos');
-      localStorage.removeItem('sentidos_boletos');
-      localStorage.removeItem('sentidos_mensagens');
-      localStorage.removeItem('sentidos_logs');
+      safeRemoveItem('sentidos_alunos');
+      safeRemoveItem('sentidos_boletos');
+      safeRemoveItem('sentidos_mensagens');
+      safeRemoveItem('sentidos_logs');
 
       postToastAlert('Banco offline (localStorage) limpo para produção! Recarregando...', 'success');
 

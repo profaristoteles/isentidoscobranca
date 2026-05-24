@@ -1,3 +1,5 @@
+import { safeGetItem } from '../utils/storage';
+
 export interface EvolutionSettings {
   url: string;
   globalToken: string;
@@ -7,10 +9,10 @@ export interface EvolutionSettings {
 
 export function getEvolutionSettings(): EvolutionSettings {
   return {
-    url: localStorage.getItem('sentidos_evolution_url') || '',
-    globalToken: localStorage.getItem('sentidos_evolution_global_token') || '',
-    instanceName: localStorage.getItem('sentidos_evolution_instance') || '',
-    instanceToken: localStorage.getItem('sentidos_evolution_instance_token') || '',
+    url: safeGetItem('sentidos_evolution_url') || '',
+    globalToken: safeGetItem('sentidos_evolution_global_token') || '',
+    instanceName: safeGetItem('sentidos_evolution_instance') || '',
+    instanceToken: safeGetItem('sentidos_evolution_instance_token') || '',
   };
 }
 

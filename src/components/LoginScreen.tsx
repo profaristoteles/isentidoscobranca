@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GraduationCap, ShieldAlert, ArrowRight, Loader } from 'lucide-react';
+import { safeSetItem } from '../utils/storage';
 
 interface LoginScreenProps {
   onLoginSuccess: (email: string) => void;
@@ -35,7 +36,7 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
 
       if (response.ok && data.success) {
         if (data.token) {
-          localStorage.setItem('sentidos_auth_token', data.token);
+          safeSetItem('sentidos_auth_token', data.token);
         }
         onLoginSuccess(email);
       } else {
