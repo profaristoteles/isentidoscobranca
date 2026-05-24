@@ -1,15 +1,32 @@
 version: '3.8'
 
 services:
+  sentidos_db:
+    image: postgres:15-alpine
+    container_name: sentidos_db
+    restart: always
+    environment:
+      POSTGRES_DB: sentidos_cobrancas
+      POSTGRES_USER: sentidos_user
+      POSTGRES_PASSWORD: sentidos_password
+    volumes:
+      - sentidos_db_data:/var/lib/postgresql/data
+    networks:
+      - traefik_network
+
   sentidos_cobrancas:
     build: .
     container_name: sentidos_cobrancas
     restart: always
+    environment:
+      - DATABASE_URL=postgresql://sentidos_user:sentidos_password@sentidos_db:5432/sentidos_cobrancas
     volumes:
-      # Volume persistente para salvar o banco de dados JSON
+      # Mantemos o volume do database.json para permitir a migração automática inicial dos dados
       - ./database.json:/app/database.json
     networks:
       - traefik_network
+    depends_on:
+      - sentidos_db
     labels:
       - "traefik.enable=true"
       # Roteamento do domínio da aplicação para o container
@@ -18,6 +35,9 @@ services:
       - "traefik.http.routers.sentidos.tls.certresolver=letsencrypt"
       - "traefik.http.services.sentidos.loadbalancer.server.port=3001"
       - "traefik.http.services.sentidos.loadbalancer.passHostHeader=true"
+
+volumes:
+  sentidos_db_data:
 
 networks:
   traefik_network:
