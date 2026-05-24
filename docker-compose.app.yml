@@ -12,8 +12,8 @@ services:
       - traefik_network
     labels:
       - "traefik.enable=true"
-      # Roteamento dos domínios da aplicação e da API para o mesmo container
-      - "traefik.http.routers.sentidos.rule=Host(`app.cobranca.isentidos.com.br`) || Host(`api.cobranca.isentidos.com.br`)"
+      # Roteamento do domínio da aplicação para o container
+      - "traefik.http.routers.sentidos.rule=Host(`siscobra.isentidos.net.br`)"
       - "traefik.http.routers.sentidos.entrypoints=websecure"
       - "traefik.http.routers.sentidos.tls.certresolver=letsencrypt"
       - "traefik.http.services.sentidos.loadbalancer.server.port=3001"
