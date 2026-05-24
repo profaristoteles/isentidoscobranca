@@ -24,4 +24,4 @@ jobs:
             git pull origin main
             
             # Reconstrói e reinicia os containers
-            docker compose -f docker-compose.app.yml up -d --build
+            docker compose up -d --build
