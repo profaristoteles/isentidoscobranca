@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  sentidos_cobrancas:
+    build: .
+    container_name: sentidos_cobrancas
+    restart: always
+    volumes:
+      # Volume persistente para salvar o banco de dados JSON
+      - ./database.json:/app/database.json
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      # Roteamento dos domínios da aplicação e da API para o mesmo container
+      - "traefik.http.routers.sentidos.rule=Host(`app.cobranca.isentidos.com.br`) || Host(`api.cobranca.isentidos.com.br`)"
+      - "traefik.http.routers.sentidos.entrypoints=websecure"
+      - "traefik.http.routers.sentidos.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sentidos.loadbalancer.server.port=3001"
+      - "traefik.http.services.sentidos.loadbalancer.passHostHeader=true"
+
+networks:
+  traefik_network:
+    external: true
