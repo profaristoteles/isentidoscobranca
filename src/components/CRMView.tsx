@@ -528,11 +528,11 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
 
             <div className="space-y-3.5">
               <span className="text-[10px] font-extrabold text-[#03045e] uppercase border-b border-slate-50 pb-1 block">
-                {crmConfig.pipelines[0].nome}
+                {crmConfig.pipelines[0]?.nome || 'Pipeline Padrão'}
               </span>
               
               <div className="space-y-1.5">
-                {crmConfig.pipelines[0].fases.map((fase, fidx) => (
+                {(crmConfig.pipelines[0]?.fases || []).map((fase, fidx) => (
                   <div key={fidx} className="flex items-center gap-2.5 text-xs text-gray-700">
                     <span className="h-5 w-5 rounded-full bg-blue-50 text-[#03045e] font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
                       {fidx + 1}

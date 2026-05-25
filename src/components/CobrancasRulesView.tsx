@@ -284,7 +284,7 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
                   </div>
                   
                   <p className="font-semibold text-gray-900 whitespace-pre-wrap">
-                    {getSimulatedPreviewText(editingRuleId ? tempTemplate : regras.find(r=>r.ativo)?.mensagemTemplate || regras[0].mensagemTemplate)}
+                    {getSimulatedPreviewText(editingRuleId ? tempTemplate : regras.find(r=>r.ativo)?.mensagemTemplate || regras[0]?.mensagemTemplate || '')}
                   </p>
                 </div>
 
