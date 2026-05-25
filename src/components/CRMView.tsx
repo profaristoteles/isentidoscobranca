@@ -25,24 +25,35 @@ interface CRMViewProps {
 }
 
 export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAlert }: CRMViewProps) {
-  const [apiKey, setApiKey] = useState(crmConfig.apiKey);
-  const [webhook, setWebhook] = useState(crmConfig.urlWebhook);
+  // Garantir que crmConfig e alunos tenham valores válidos e não quebrem a tela
+  const config = crmConfig || {
+    apiKey: '',
+    urlWebhook: '',
+    sincronizacaoAtiva: false,
+    logSincronizacao: [],
+    pipelines: [],
+    tagMap: {}
+  };
+  const safeAlunos = alunos || [];
+
+  const [apiKey, setApiKey] = useState(config.apiKey || '');
+  const [webhook, setWebhook] = useState(config.urlWebhook || '');
   const [isSyncingNow, setIsSyncingNow] = useState(false);
   const [testConnectionStatus, setTestConnectionStatus] = useState<'IDLE' | 'TESTING' | 'SUCCESS' | 'FAIL'>('IDLE');
 
   // Tags states mapping
-  const [tagPago, setTagPago] = useState(crmConfig.tagMap.pago);
-  const [tagPendente, setTagPendente] = useState(crmConfig.tagMap.pendente);
-  const [tagInadimplente, setTagInadimplente] = useState(crmConfig.tagMap.inadimplente);
+  const [tagPago, setTagPago] = useState(config.tagMap?.pago || '');
+  const [tagPendente, setTagPendente] = useState(config.tagMap?.pendente || '');
+  const [tagInadimplente, setTagInadimplente] = useState(config.tagMap?.inadimplente || '');
 
   // Webhook Simulation states
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(alunos[0]?.id || '');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(safeAlunos[0]?.id || '');
   const [webhookEvent, setWebhookEvent] = useState<'contact_status_update' | 'tag_added' | 'pipeline_moved'>('contact_status_update');
   const [testWebhookStatus, setTestWebhookStatus] = useState<'IDLE' | 'SENDING' | 'SUCCESS' | 'FAIL'>('IDLE');
   const [webhookResponseDetail, setWebhookResponseDetail] = useState<string>('');
 
   const getSelectedStudent = () => {
-    return alunos.find(a => a.id === selectedStudentId) || alunos[0];
+    return safeAlunos.find(a => a?.id === selectedStudentId) || safeAlunos[0];
   };
 
   const generateWebhookPayload = () => {
@@ -52,7 +63,9 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
     let tags = [
       student.statusFinanceiro === 'EM_DIA' ? tagPago : student.statusFinanceiro === 'PENDENTE' ? tagPendente : tagInadimplente
     ];
-    tags.push(student.curso.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, ''));
+    if (student.curso) {
+      tags.push(student.curso.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, ''));
+    }
 
     let pipelineStage = "Faturamento Pendente";
     if (student.statusFinanceiro === 'EM_DIA') {
@@ -65,20 +78,20 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
       event: webhookEvent,
       source: "Sentidos Cobranças",
       contact: {
-        id: `contact_${student.id}`,
-        name: student.nome,
-        email: student.email,
-        phone: student.whatsapp,
+        id: `contact_${student.id || 'unknown'}`,
+        name: student.nome ?? 'Sem nome',
+        email: student.email || '',
+        phone: student.whatsapp || '',
         tags: tags,
         customFields: {
-          matricula: student.matricula,
-          polo: student.polo,
-          valor_pendente: student.valorPendente
+          matricula: student.matricula || '',
+          polo: student.polo || '',
+          valor_pendente: student.valorPendente || 0
         }
       },
       pipeline: {
-        id: crmConfig.pipelines[0]?.id || "pip_cobrancas",
-        name: crmConfig.pipelines[0]?.nome || "Régua de Cobrança FAEPI",
+        id: config.pipelines?.[0]?.id || "pip_cobrancas",
+        name: config.pipelines?.[0]?.nome || "Régua de Cobrança FAEPI",
         stage: pipelineStage
       },
       timestamp: new Date().toISOString()
@@ -101,10 +114,10 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
         const nowString = new Date().toISOString().replace('T', ' ').substring(0,19);
         const updatedLogs = [
           `${nowString} - Webhook Simulado enviado para ${payload.contact.name} (Event: ${payload.event})`,
-          ...crmConfig.logSincronizacao
+          ...(config.logSincronizacao || [])
         ];
         onUpdateCrmConfig({
-          ...crmConfig,
+          ...config,
           logSincronizacao: updatedLogs
         });
 
@@ -135,10 +148,10 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
         const nowString = new Date().toISOString().replace('T', ' ').substring(0,19);
         const updatedLogs = [
           `${nowString} - Webhook REAL enviado para ${payload.contact.name} - Status ${response.status}`,
-          ...crmConfig.logSincronizacao
+          ...(config.logSincronizacao || [])
         ];
         onUpdateCrmConfig({
-          ...crmConfig,
+          ...config,
           logSincronizacao: updatedLogs
         });
         
@@ -156,10 +169,10 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
       const nowString = new Date().toISOString().replace('T', ' ').substring(0,19);
       const updatedLogs = [
         `${nowString} - Webhook disparado (Erro de CORS/Rede, verifique console/configurações)`,
-        ...crmConfig.logSincronizacao
+        ...(config.logSincronizacao || [])
       ];
       onUpdateCrmConfig({
-        ...crmConfig,
+        ...config,
         logSincronizacao: updatedLogs
       });
       
@@ -169,9 +182,9 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
 
 
   const handleToggleSync = () => {
-    const nextState = !crmConfig.sincronizacaoAtiva;
+    const nextState = !config.sincronizacaoAtiva;
     const nextCfg: CrmConfig = {
-      ...crmConfig,
+      ...config,
       sincronizacaoAtiva: nextState
     };
     onUpdateCrmConfig(nextCfg);
@@ -199,11 +212,11 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
       const nowString = new Date().toISOString().replace('T', ' ').substring(0,19);
       const updatedLogs = [
         `${nowString} - Sincronização sob-demanda concluída com sucesso: 10 alunos mapeados.`,
-        ...crmConfig.logSincronizacao
+        ...(config.logSincronizacao || [])
       ];
       
       const updatedCfg: CrmConfig = {
-        ...crmConfig,
+        ...config,
         apiKey,
         urlWebhook: webhook,
         tagMap: {
@@ -222,7 +235,7 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedCfg: CrmConfig = {
-      ...crmConfig,
+      ...config,
       apiKey,
       urlWebhook: webhook,
       tagMap: {
@@ -268,12 +281,12 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
               <button 
                 onClick={handleToggleSync}
                 className={`text-[10px] font-bold px-2.5 py-1 rounded transition cursor-pointer ${
-                  crmConfig.sincronizacaoAtiva 
+                  config.sincronizacaoAtiva 
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                     : 'bg-red-50 text-red-700 border border-red-200'
                 }`}
               >
-                {crmConfig.sincronizacaoAtiva ? 'Mecanismo Ativo' : 'Sincronizador Pausado'}
+                {config.sincronizacaoAtiva ? 'Mecanismo Ativo' : 'Sincronizador Pausado'}
               </button>
             </h3>
 
@@ -400,9 +413,9 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
                   onChange={(e) => setSelectedStudentId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-blue-500 focus:bg-white focus:outline-hidden font-medium cursor-pointer"
                 >
-                  {alunos.map(al => (
-                    <option key={al.id} value={al.id}>
-                      {al.nome} ({al.statusFinanceiro === 'EM_DIA' ? 'Em Dia' : al.statusFinanceiro === 'PENDENTE' ? 'Pendente' : 'Inadimplente'})
+                  {safeAlunos.map(al => (
+                    <option key={al?.id || Math.random().toString()} value={al?.id || ''}>
+                      {al?.nome ?? 'Sem nome'} ({al?.statusFinanceiro === 'EM_DIA' ? 'Em Dia' : al?.statusFinanceiro === 'PENDENTE' ? 'Pendente' : 'Inadimplente'})
                     </option>
                   ))}
                 </select>
@@ -507,7 +520,7 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
             </h3>
 
             <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-              {crmConfig.logSincronizacao.map((log, idx) => (
+              {(config.logSincronizacao || []).map((log, idx) => (
                 <div key={idx} className="bg-slate-50 border border-gray-100 p-2.5 rounded-lg text-[10px] font-mono text-gray-650 text-gray-600 flex justify-between gap-3 leading-tight">
                   <span className="font-semibold text-gray-800">{log}</span>
                   <span className="text-emerald-600 font-bold shrink-0 uppercase text-[9px]">Push OK</span>
@@ -528,11 +541,11 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
 
             <div className="space-y-3.5">
               <span className="text-[10px] font-extrabold text-[#03045e] uppercase border-b border-slate-50 pb-1 block">
-                {crmConfig.pipelines[0]?.nome || 'Pipeline Padrão'}
+                {config.pipelines?.[0]?.nome ?? 'Pipeline Padrão'}
               </span>
               
               <div className="space-y-1.5">
-                {(crmConfig.pipelines[0]?.fases || []).map((fase, fidx) => (
+                {(config.pipelines?.[0]?.fases ?? []).map((fase, fidx) => (
                   <div key={fidx} className="flex items-center gap-2.5 text-xs text-gray-700">
                     <span className="h-5 w-5 rounded-full bg-blue-50 text-[#03045e] font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
                       {fidx + 1}

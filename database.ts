@@ -199,6 +199,10 @@ export async function initDb(): Promise<void> {
         detalhe TEXT NOT NULL,
         sucesso BOOLEAN NOT NULL
       );
+
+      -- Garante a existência do registro padrão id=1
+      INSERT INTO crm_config (id)
+      SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM crm_config WHERE id = 1);
     `);
 
     // Check if database already has users/data
