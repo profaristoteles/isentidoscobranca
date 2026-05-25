@@ -8,17 +8,17 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-sentidos_cobrancas}
       POSTGRES_USER: ${DB_USER:-sentidos_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-siscobra_pass_123}
     volumes:
       - siscobra_db_data:/var/lib/postgresql/data
     networks:
       - siscobra_internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentidos_user -d sentidos_cobrancas"]
+      test: ["CMD-SHELL", "pg_isready -U sentidos_user"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 40s
     logging:
       driver: "json-file"
       options:
@@ -30,7 +30,7 @@ services:
     container_name: siscobra_app
     restart: always
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-sentidos_user}:${DB_PASSWORD}@sentidos_db:5432/${DB_NAME:-sentidos_cobrancas}
+      - DATABASE_URL=postgresql://${DB_USER:-sentidos_user}:${DB_PASSWORD:-siscobra_pass_123}@sentidos_db:5432/${DB_NAME:-sentidos_cobrancas}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - APP_URL=${APP_URL}
     networks:
