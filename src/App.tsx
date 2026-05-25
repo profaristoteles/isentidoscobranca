@@ -742,6 +742,41 @@ export default function App() {
       safeRemoveItem('sentidos_logs');
       safeRemoveItem('sentidos_polos');
       safeRemoveItem('sentidos_users');
+      postToastAlert('Banco de dados local redefinido para o padrão! Recarregando...', 'warning');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
+      {/* Sidebar Component */}
+      <Sidebar 
+        currentView={currentView} 
+        onSelectView={setCurrentView} 
+        onResetDatabase={handleResetDatabase}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full relative">
+        <Topbar 
+          currentView={currentView} 
+          user={user} 
+          onLogout={onLogout} 
+          onToggleMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        />
+        
+        {/* Core display panels container */}
+        <main className="pt-24 px-4 sm:px-8 pb-12 flex-1 w-full max-w-full overflow-x-hidden overflow-y-auto">
+          {renderCurrentView()}
+        </main>
+      </div>
+
+      {/* Toast Notification System */}
+      {toast && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white rounded-xl shadow-2xl p-4 border border-white/10 flex items-start gap-3 max-w-sm transition-all duration-300 transform translate-y-0 scale-100 animate-slide-up">
           <div className="shrink-0 mt-0.5">
             {toast.type === 'success' && <CheckCircle className="h-5 w-5 text-emerald-400" />}
