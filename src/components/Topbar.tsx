@@ -7,7 +7,8 @@ import {
   Globe, 
   Zap, 
   Wifi,
-  Bookmark
+  Bookmark,
+  Menu
 } from 'lucide-react';
 
 interface TopbarProps {
@@ -18,6 +19,7 @@ interface TopbarProps {
   selectedStudentName?: string | null;
   onSelectStudentBack?: () => void;
   isUsingApi?: boolean;
+  onToggleMenu?: () => void;
 }
 
 export default function Topbar({ 
@@ -26,7 +28,8 @@ export default function Topbar({
   whatsappOnline,
   selectedStudentName,
   onSelectStudentBack,
-  isUsingApi = false
+  isUsingApi = false,
+  onToggleMenu
 }: TopbarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -54,9 +57,17 @@ export default function Topbar({
   ];
 
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8 fixed top-0 right-0 left-64 z-10 shadow-xs">
+    <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-8 fixed top-0 right-0 left-0 lg:left-64 z-10 shadow-xs transition-all duration-300">
       {/* Left section: Breadcrumb and title */}
       <div className="flex items-center gap-3">
+        {/* Mobile menu toggle */}
+        <button 
+          onClick={onToggleMenu}
+          className="p-1.5 -ml-1.5 mr-1 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden transition cursor-pointer"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
         {selectedStudentName && currentTab === 'alunos' && (
           <button 
             onClick={onSelectStudentBack}
@@ -71,7 +82,7 @@ export default function Topbar({
             <span className="h-1 w-1 rounded-full bg-gray-300"></span>
             <span className="text-[10px] font-mono font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase leading-none">Produção</span>
           </div>
-          <h2 className="text-sm font-semibold text-gray-900 capitalize tracking-tight mt-0.5">
+          <h2 className="text-sm font-semibold text-gray-900 capitalize tracking-tight mt-0.5 truncate max-w-[150px] sm:max-w-xs">
             {selectedStudentName && currentTab === 'alunos' ? selectedStudentName : getTabLabel()}
           </h2>
         </div>

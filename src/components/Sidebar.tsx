@@ -19,9 +19,11 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
   onLogout: () => void;
   userEmail: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ currentTab, onTabChange, onLogout, userEmail }: SidebarProps) {
+export default function Sidebar({ currentTab, onTabChange, onLogout, userEmail, isOpen, onClose }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, badge: null },
     { id: 'alunos', name: 'Alunos', icon: Users, badge: null },
@@ -34,12 +36,31 @@ export default function Sidebar({ currentTab, onTabChange, onLogout, userEmail }
   ];
 
   return (
-    <aside className="w-64 bg-[#03045e] text-white flex flex-col h-screen fixed top-0 left-0 z-20 shadow-2xl transition-all duration-300">
-      {/* Brand Header */}
-      <div className="p-6 border-b border-[#03045e]/30 flex flex-col gap-1.5 justify-center">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-gradient-to-br from-[#ff8000] to-orange-500 rounded-lg shadow-md animate-pulse">
-            <GraduationCap className="h-6 w-6 text-white" />
+    <>
+      {/* Mobile backdrop overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm" 
+          onClick={onClose}
+        />
+      )}
+      
+      <aside className={`w-64 bg-[#03045e] text-white flex flex-col h-screen fixed top-0 left-0 z-30 shadow-2xl transition-transform duration-300 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
+        {/* Brand Header */}
+        <div className="p-6 border-b border-[#03045e]/30 flex flex-col gap-1.5 justify-center relative">
+          {/* Close button on mobile */}
+          <button 
+            className="absolute top-4 right-4 p-1 rounded-md text-blue-200 hover:text-white hover:bg-white/10 lg:hidden transition cursor-pointer"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-gradient-to-br from-[#ff8000] to-orange-500 rounded-lg shadow-md animate-pulse">
+              <GraduationCap className="h-6 w-6 text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white leading-tight">
@@ -114,5 +135,6 @@ export default function Sidebar({ currentTab, onTabChange, onLogout, userEmail }
         </button>
       </div>
     </aside>
+    </>
   );
 }
