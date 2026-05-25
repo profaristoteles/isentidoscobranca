@@ -14,11 +14,11 @@ services:
     networks:
       - siscobra_internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sentidos_user} -d ${DB_NAME:-sentidos_cobrancas}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     logging:
       driver: "json-file"
       options:
