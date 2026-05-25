@@ -1,42 +1,64 @@
-version: '3.8'
+name: siscobra-prod
 
 services:
   sentidos_db:
     image: postgres:15-alpine
+    container_name: siscobra_db
     restart: always
     environment:
-      POSTGRES_DB: sentidos_cobrancas
-      POSTGRES_USER: sentidos_user
-      POSTGRES_PASSWORD: sentidos_password
+      POSTGRES_DB: ${DB_NAME:-sentidos_cobrancas}
+      POSTGRES_USER: ${DB_USER:-sentidos_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - sentidos_db_data:/var/lib/postgresql/data
+      - siscobra_db_data:/var/lib/postgresql/data
     networks:
-      - traefik_network
+      - siscobra_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sentidos_user} -d ${DB_NAME:-sentidos_cobrancas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   sentidos_cobrancas:
     build: .
+    container_name: siscobra_app
     restart: always
     environment:
-      - DATABASE_URL=postgresql://sentidos_user:sentidos_password@sentidos_db:5432/sentidos_cobrancas
-    volumes:
-      # Mantemos o volume do database.json para permitir a migração automática inicial dos dados
-      - ./database.json:/app/database.json
+      - DATABASE_URL=postgresql://${DB_USER:-sentidos_user}:${DB_PASSWORD}@sentidos_db:5432/${DB_NAME:-sentidos_cobrancas}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_URL=${APP_URL}
     networks:
       - traefik_network
+      - siscobra_internal
     depends_on:
-      - sentidos_db
+      sentidos_db:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
-      # Roteamento do domínio da aplicação para o container
-      - "traefik.http.routers.sentidos.rule=Host(`siscobra.isentidos.net.br`)"
-      - "traefik.http.routers.sentidos.entrypoints=websecure"
-      - "traefik.http.routers.sentidos.tls.certresolver=letsencrypt"
-      - "traefik.http.services.sentidos.loadbalancer.server.port=3001"
-      - "traefik.http.services.sentidos.loadbalancer.passHostHeader=true"
+      - "traefik.http.routers.siscobra.rule=Host(`${DOMAIN_NAME:-siscobra.isentidos.net.br}`)"
+      - "traefik.http.routers.siscobra.entrypoints=websecure"
+      - "traefik.http.routers.siscobra.tls.certresolver=letsencrypt"
+      - "traefik.http.services.siscobra.loadbalancer.server.port=3001"
+      - "traefik.http.services.siscobra.loadbalancer.passHostHeader=true"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
 
 volumes:
-  sentidos_db_data:
+  siscobra_db_data:
+    name: siscobra_db_data_prod
 
 networks:
   traefik_network:
     external: true
+  siscobra_internal:
+    internal: true
+    name: siscobra_internal_net
