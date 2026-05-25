@@ -27,7 +27,6 @@ services:
 
   sentidos_cobrancas:
     build: .
-    image: siscobra_app:v2
     container_name: siscobra_app
     restart: always
     environment:
