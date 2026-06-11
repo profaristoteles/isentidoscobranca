@@ -33,13 +33,11 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
   // Template replacements simulator for rendering Live Previews
   const getSimulatedPreviewText = (template: string) => {
     return template
-      .replace('{nome_aluno}', 'Mariana Silva Santos')
-      .replace('{curso}', 'Pós-Graduação em Neuropsicologia Clínica')
-      .replace('{valor_boleto}', 'R$ 450,00')
-      .replace('{vencimento_boleto}', '10/06/2026')
-      .replace('{competencia}', '06/2026')
-      .replace('{link_pdf}', 'https://sentidos.edu.br/b/mariana-45120a')
-      .replace('{linha_digitavel}', '00190.00009 02738.162006 12345.678901 8 99830000045000');
+      .replace(/{nome_aluno}/g, 'Mariana Silva Santos')
+      .replace(/{curso}/g, 'Pós-Graduação em Neuropsicologia Clínica')
+      .replace(/{valor}/g, 'R$ 450,00')
+      .replace(/{vencimento}/g, '10/06/2026')
+      .replace(/{parcela}/g, '08/18');
   };
 
   const handleToggleActive = (ruleId: string) => {
@@ -306,27 +304,23 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
             <div className="space-y-2 text-[10px]">
               <div className="flex justify-between items-center border-b border-slate-50 pb-1.5">
                 <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{nome_aluno}"}</code>
-                <span className="text-gray-500">Nome completo do sacante</span>
+                <span className="text-gray-500">Nome completo do aluno</span>
               </div>
               <div className="flex justify-between items-center border-b border-slate-50 pb-1.5">
                 <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{curso}"}</code>
                 <span className="text-gray-500">Curso cadastrado</span>
               </div>
               <div className="flex justify-between items-center border-b border-slate-50 pb-1.5">
-                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{valor_boleto}"}</code>
-                <span className="text-gray-500">Valor com R$</span>
+                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{parcela}"}</code>
+                <span className="text-gray-500">Número da parcela (ex: 08/18)</span>
               </div>
               <div className="flex justify-between items-center border-b border-slate-50 pb-1.5">
-                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{vencimento_boleto}"}</code>
-                <span className="text-gray-500">Data de vencimento</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-slate-50 pb-1.5">
-                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{linha_digitavel}"}</code>
-                <span className="text-gray-500">Código digitável do boleto</span>
+                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{valor}"}</code>
+                <span className="text-gray-500">Valor atual com R$</span>
               </div>
               <div className="flex justify-between items-center">
-                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{link_pdf}"}</code>
-                <span className="text-gray-500">URL para download em PDF</span>
+                <code className="text-orange-600 font-bold bg-orange-50 px-1 py-0.5 rounded">{"{vencimento}"}</code>
+                <span className="text-gray-500">Data de vencimento</span>
               </div>
             </div>
           </div>

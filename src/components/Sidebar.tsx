@@ -1,17 +1,16 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
-  UploadCloud, 
-  Sliders, 
-  MessageSquare, 
-  Cpu, 
-  Settings, 
-  GraduationCap, 
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Sliders,
+  MessageSquare,
+  Cpu,
+  Settings,
+  GraduationCap,
   LogOut,
   ChevronRight,
-  Sparkles
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,8 +26,7 @@ export default function Sidebar({ currentTab, onTabChange, onLogout, userEmail, 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, badge: null },
     { id: 'alunos', name: 'Alunos', icon: Users, badge: null },
-    { id: 'boletos', name: 'Boletos', icon: FileText, badge: null },
-    { id: 'importações', name: 'Importações', icon: UploadCloud, badge: 'OCR' },
+    { id: 'parcelas', name: 'Parcelas', icon: FileText, badge: 'Financeiro' },
     { id: 'cobranças', name: 'Cobranças', icon: Sliders, badge: 'Régua' },
     { id: 'whatsapp', name: 'WhatsApp', icon: MessageSquare, badge: 'API' },
     { id: 'crm', name: 'CRM Integration', icon: Cpu, badge: 'Active' },

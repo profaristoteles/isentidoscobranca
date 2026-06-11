@@ -578,7 +578,7 @@ export default function ConfiguracoesView({
                       Consentimento de Disparo por WhatsApp
                     </label>
                     <span className="text-gray-500 leading-relaxed block font-medium">
-                      O robô de Evolution-API só enviará o boleto bancário se o estudante der o opt-in de recebimento durante a efetivação da matrícula na secretaria.
+                      O robô de Evolution-API só enviará a cobrança da parcela se o estudante der o opt-in de recebimento durante a efetivação da matrícula na secretaria.
                     </span>
                   </div>
                 </div>
@@ -674,7 +674,7 @@ export default function ConfiguracoesView({
                       <AlertTriangle className="h-4 w-4 text-red-600" />
                       Limpar e Redefinir Banco de Dados
                     </p>
-                    <p className="text-gray-500 font-medium">Apaga todos os dados correntes e recria os alunos, boletos e logs iniciais de homologação.</p>
+                    <p className="text-gray-500 font-medium">Apaga todos os dados correntes e recria os alunos, parcelas e logs iniciais de homologação. Um backup é gravado antes (database.boletos.backup.json).</p>
                   </div>
 
                   <button
@@ -697,12 +697,12 @@ export default function ConfiguracoesView({
                       <Trash2 className="h-4 w-4 text-orange-600" />
                       Limpar Dados de Produção (Blank Slate)
                     </p>
-                    <p className="text-gray-500 font-medium">Exclui todos os Alunos, Boletos, Mensagens e Logs correntes. Preserva os modelos de réguas, polos e chaves de API.</p>
+                    <p className="text-gray-500 font-medium">Exclui todos os Alunos, Parcelas, Mensagens e Logs correntes. Preserva os modelos de réguas, polos e chaves de API. Um backup é gravado antes.</p>
                   </div>
 
                   <button
                     onClick={() => {
-                      if (window.confirm("Atenção: Isso excluirá permanentemente todos os Alunos, Boletos, Mensagens e Logs para iniciar o sistema em produção com dados reais. Suas réguas de cobrança e chaves de API serão preservadas. Deseja prosseguir?")) {
+                      if (window.confirm("Atenção: Isso excluirá permanentemente todos os Alunos, Parcelas, Mensagens e Logs para iniciar o sistema em produção com dados reais. Suas réguas de cobrança e chaves de API serão preservadas. Um backup será gravado antes. Deseja prosseguir?")) {
                         onClearDatabase();
                       }
                     }}
@@ -731,7 +731,7 @@ export default function ConfiguracoesView({
               <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">Configurações de Integrações & APIs</h3>
-                  <p className="text-xs text-gray-400">Configure chaves de acesso e modelos para alimentar os motores de OCR e IA</p>
+                  <p className="text-xs text-gray-400">Configure chaves de acesso e modelos de IA para o atendimento automatizado</p>
                 </div>
                 
                 {/* Active Provider Dropdown */}

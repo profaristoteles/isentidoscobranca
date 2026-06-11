@@ -38,8 +38,7 @@ export default function Topbar({
     switch(currentTab) {
       case 'dashboard': return 'Resumo Financeiro';
       case 'alunos': return selectedStudentName ? `Alunos / Detalhe do Aluno` : 'Gestão de Alunos';
-      case 'boletos': return 'Cobranças / Lista de Boletos';
-      case 'importações': return 'Importação de Boletos CNAB / PDF';
+      case 'parcelas': return 'Financeiro / Parcelas';
       case 'cobranças': return 'Parâmetros / Régua de Cobrança';
       case 'whatsapp': return 'Automação WhatsApp & Evolution API';
       case 'crm': return 'Integrações / LeadConnector pipeline';
@@ -51,7 +50,7 @@ export default function Topbar({
   const currentDateTimeString = '22 de Maio de 2026, 12:39';
 
   const mockAlerts = [
-    { id: 1, title: 'Boleto Vencido', text: 'Camila Guimarães está há 15 dias atrasada.', time: 'Há 5m', read: false },
+    { id: 1, title: 'Parcela Vencida', text: 'Camila Guimarães está há 15 dias atrasada.', time: 'Há 5m', read: false },
     { id: 2, title: 'Evolution API', text: 'Sincronização de QR Code restabelecida com sucesso.', time: 'Há 1h', read: true },
     { id: 3, title: 'LeadConnector', text: 'Tag "inadimplente-critico" gerou 3 novos gatilhos de CRM.', time: 'Há 4h', read: true }
   ];

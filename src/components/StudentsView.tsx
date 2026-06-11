@@ -53,6 +53,15 @@ export default function StudentsView({
   const [curso, setCurso] = useState('');
   const [polo, setPolo] = useState(polos[0] || 'Teresina (Sede)');
   const [modalidade, setModalidade] = useState<'Presencial' | 'Online'>('Presencial');
+
+  // Matrícula financeira fields
+  const [turma, setTurma] = useState('');
+  const [valorMensalidade, setValorMensalidade] = useState('');
+  const [totalParcelas, setTotalParcelas] = useState('');
+  const [parcelasPagas, setParcelasPagas] = useState('');
+  const [primeiroVencimento, setPrimeiroVencimento] = useState('');
+  const [diaVencimento, setDiaVencimento] = useState('');
+  const [dataMatricula, setDataMatricula] = useState('');
   
   // Bulk fields
   const [bulkText, setBulkText] = useState('');
@@ -67,6 +76,13 @@ export default function StudentsView({
     setCurso('');
     setPolo(polos[0] || 'Teresina (Sede)');
     setModalidade('Presencial');
+    setTurma('');
+    setValorMensalidade('');
+    setTotalParcelas('');
+    setParcelasPagas('');
+    setPrimeiroVencimento('');
+    setDiaVencimento('');
+    setDataMatricula('');
     setBulkText('');
     setBulkParsed([]);
     setBulkError(null);
@@ -94,8 +110,9 @@ export default function StudentsView({
         return;
       }
       
-      const [nomeVal, emailVal, cpfVal, whatsappVal, cursoVal, poloVal, modalidadeVal] = parts;
-      
+      const [nomeVal, emailVal, cpfVal, whatsappVal, cursoVal, poloVal, modalidadeVal,
+        turmaVal, valorVal, totalVal, pagasVal, primeiroVencVal, diaVal] = parts;
+
       let modVal: 'Presencial' | 'Online' = 'Presencial';
       if (modalidadeVal) {
         const cleanMod = modalidadeVal.trim().toLowerCase();
@@ -103,7 +120,13 @@ export default function StudentsView({
           modVal = 'Online';
         }
       }
-      
+
+      const toNum = (v?: string) => {
+        if (!v || !v.trim()) return undefined;
+        const n = parseFloat(v.replace(',', '.'));
+        return isNaN(n) ? undefined : n;
+      };
+
       parsedList.push({
         nome: nomeVal || '',
         email: emailVal || '',
@@ -111,7 +134,13 @@ export default function StudentsView({
         whatsapp: whatsappVal || '',
         curso: cursoVal || '',
         polo: poloVal || (polos[0] || 'Teresina (Sede)'),
-        modalidade: modVal
+        modalidade: modVal,
+        turma: (turmaVal && turmaVal.trim()) || undefined,
+        valorMensalidade: toNum(valorVal),
+        totalParcelas: toNum(totalVal),
+        parcelasPagas: toNum(pagasVal) ?? 0,
+        primeiroVencimentoEmAberto: (primeiroVencVal && primeiroVencVal.trim()) || undefined,
+        diaVencimento: toNum(diaVal)
       });
     }
     
@@ -131,6 +160,12 @@ export default function StudentsView({
     reader.readAsText(file);
   };
 
+  const numOrUndef = (v: string) => {
+    if (!v || !v.trim()) return undefined;
+    const n = parseFloat(v.replace(',', '.'));
+    return isNaN(n) ? undefined : n;
+  };
+
   const handleIndividualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome || !email || !cpf || !whatsapp || !curso) return;
@@ -142,7 +177,14 @@ export default function StudentsView({
       whatsapp,
       curso,
       polo,
-      modalidade
+      modalidade,
+      turma: turma.trim() || undefined,
+      valorMensalidade: numOrUndef(valorMensalidade),
+      totalParcelas: numOrUndef(totalParcelas),
+      parcelasPagas: numOrUndef(parcelasPagas) ?? 0,
+      primeiroVencimentoEmAberto: primeiroVencimento.trim() || undefined,
+      diaVencimento: numOrUndef(diaVencimento),
+      dataMatriculaFinanceira: dataMatricula.trim() || undefined
     }]);
 
     setShowModal(false);
@@ -590,16 +632,55 @@ export default function StudentsView({
                       </select>
                     </div>
                   </div>
+
+                  {/* Matrícula Financeira */}
+                  <div className="pt-3 border-t border-gray-100 space-y-3">
+                    <h5 className="text-[10px] font-bold uppercase tracking-wider text-[#ff8000]">Matrícula Financeira (gera as parcelas automaticamente)</h5>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Turma</label>
+                        <input type="text" value={turma} onChange={(e) => setTurma(e.target.value)} placeholder="2025.2" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Mensalidade (R$)</label>
+                        <input type="number" step="0.01" value={valorMensalidade} onChange={(e) => setValorMensalidade(e.target.value)} placeholder="180.00" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Parcelas</label>
+                        <input type="number" value={totalParcelas} onChange={(e) => setTotalParcelas(e.target.value)} placeholder="18" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Parcelas Pagas</label>
+                        <input type="number" value={parcelasPagas} onChange={(e) => setParcelasPagas(e.target.value)} placeholder="7" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">1º Venc. em Aberto</label>
+                        <input type="text" value={primeiroVencimento} onChange={(e) => setPrimeiroVencimento(e.target.value)} placeholder="10/06/2026" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Dia Vencimento</label>
+                        <input type="number" value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} placeholder="10" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Data da Matrícula</label>
+                        <input type="text" value={dataMatricula} onChange={(e) => setDataMatricula(e.target.value)} placeholder="15/02/2025" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400">O 1º vencimento pode ser uma data passada — parcelas já vencidas nascem como ATRASADO.</p>
+                  </div>
                 </form>
               ) : (
                 <div className="space-y-4">
                   <div>
                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Cole linhas contendo dados separados por vírgula (<code>,</code>) ou ponto-e-vírgula (<code>;</code>) na ordem:<br />
-                      <strong>Nome, E-mail, CPF, WhatsApp, Curso, Polo, Modalidade (Opcional - Presencial/Online)</strong>.
+                      Cole linhas separadas por vírgula (<code>,</code>) ou ponto-e-vírgula (<code>;</code>) na ordem:<br />
+                      <strong>Nome, E-mail, CPF, WhatsApp, Curso, Polo, Modalidade, Turma, Mensalidade, Total Parcelas, Parcelas Pagas, 1º Vencimento (DD/MM/AAAA), Dia Vencimento</strong>.
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      As 6 primeiras colunas são obrigatórias; as financeiras geram as parcelas. O 1º vencimento pode ser passado (gera parcelas já vencidas e a vencer).
                     </p>
                     <p className="text-[10px] text-orange-600 font-semibold mt-1">
-                      Exemplo: Mariana Silva, mariana@faepi.edu.br, 123.456.789-00, +55 (86) 99876-5432, Neuropsicologia, Teresina (Sede), Online
+                      Exemplo: Mariana Silva, mariana@faepi.edu.br, 123.456.789-00, +55 (86) 99876-5432, Neuropsicologia, Teresina (Sede), Online, 2025.2, 180.00, 18, 7, 10/06/2026, 10
                     </p>
                   </div>
 

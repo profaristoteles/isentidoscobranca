@@ -1,4 +1,14 @@
-import { Aluno, Boleto, WhatsAppMensagem, CobrancaRegra, CrmConfig, LogAtividade, Colaborador } from './types';
+import {
+  Aluno,
+  Parcela,
+  ParcelaHistorico,
+  WhatsAppMensagem,
+  CobrancaRegra,
+  CrmConfig,
+  LogAtividade,
+  Colaborador
+} from './types';
+import { generateParcelas, novoHistorico } from './utils/parcelas';
 
 export const INITIAL_POLOS: string[] = ['Teresina (Sede)', 'Parnaíba', 'Floriano', 'Picos'];
 
@@ -17,7 +27,14 @@ export const INITIAL_ALUNOS: Aluno[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
     cadastroData: '2025-01-15',
     modalidade: 'Presencial',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2025.2',
+    valorMensalidade: 450.0,
+    totalParcelas: 18,
+    parcelasPagas: 7,
+    primeiroVencimentoEmAberto: '10/06/2026',
+    diaVencimento: 10,
+    dataMatriculaFinanceira: '15/01/2025'
   },
   {
     id: 'student-2',
@@ -29,11 +46,18 @@ export const INITIAL_ALUNOS: Aluno[] = [
     whatsapp: '+55 (86) 99421-8899',
     email: 'ricardo.moura@gmail.com',
     statusFinanceiro: 'PENDENTE',
-    valorPendente: 380.00,
+    valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
     cadastroData: '2024-08-10',
     modalidade: 'Online',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2024.1',
+    valorMensalidade: 380.0,
+    totalParcelas: 12,
+    parcelasPagas: 3,
+    primeiroVencimentoEmAberto: '15/05/2026',
+    diaVencimento: 15,
+    dataMatriculaFinanceira: '10/08/2024'
   },
   {
     id: 'student-3',
@@ -45,11 +69,18 @@ export const INITIAL_ALUNOS: Aluno[] = [
     whatsapp: '+55 (86) 99199-3122',
     email: 'camila.rocha@hotmail.com',
     statusFinanceiro: 'INADIMPLENTE',
-    valorPendente: 1140.00,
+    valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
     cadastroData: '2025-01-11',
     modalidade: 'Presencial',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2025.1',
+    valorMensalidade: 380.0,
+    totalParcelas: 18,
+    parcelasPagas: 2,
+    primeiroVencimentoEmAberto: '12/03/2026',
+    diaVencimento: 12,
+    dataMatriculaFinanceira: '11/01/2025'
   },
   {
     id: 'student-4',
@@ -65,7 +96,14 @@ export const INITIAL_ALUNOS: Aluno[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
     cadastroData: '2025-02-01',
     modalidade: 'Presencial',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2025.2',
+    valorMensalidade: 290.0,
+    totalParcelas: 10,
+    parcelasPagas: 5,
+    primeiroVencimentoEmAberto: '22/07/2026',
+    diaVencimento: 22,
+    dataMatriculaFinanceira: '01/02/2025'
   },
   {
     id: 'student-5',
@@ -77,11 +115,18 @@ export const INITIAL_ALUNOS: Aluno[] = [
     whatsapp: '+55 (86) 98844-0011',
     email: 'fernandal@faepi.edu.br',
     statusFinanceiro: 'INADIMPLENTE',
-    valorPendente: 760.00,
+    valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
     cadastroData: '2024-05-18',
     modalidade: 'Online',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2024.2',
+    valorMensalidade: 380.0,
+    totalParcelas: 24,
+    parcelasPagas: 10,
+    primeiroVencimentoEmAberto: '10/04/2026',
+    diaVencimento: 10,
+    dataMatriculaFinanceira: '18/05/2024'
   },
   {
     id: 'student-6',
@@ -97,7 +142,14 @@ export const INITIAL_ALUNOS: Aluno[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150',
     cadastroData: '2025-03-10',
     modalidade: 'Presencial',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2025.2',
+    valorMensalidade: 450.0,
+    totalParcelas: 18,
+    parcelasPagas: 4,
+    primeiroVencimentoEmAberto: '10/08/2026',
+    diaVencimento: 10,
+    dataMatriculaFinanceira: '10/03/2025'
   },
   {
     id: 'student-7',
@@ -109,11 +161,18 @@ export const INITIAL_ALUNOS: Aluno[] = [
     whatsapp: '+55 (86) 98112-9011',
     email: 'anabeatryz@gmail.com',
     statusFinanceiro: 'PENDENTE',
-    valorPendente: 420.00,
+    valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
     cadastroData: '2024-09-02',
     modalidade: 'Online',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2024.1',
+    valorMensalidade: 420.0,
+    totalParcelas: 12,
+    parcelasPagas: 6,
+    primeiroVencimentoEmAberto: '22/06/2026',
+    diaVencimento: 22,
+    dataMatriculaFinanceira: '02/09/2024'
   },
   {
     id: 'student-8',
@@ -129,7 +188,14 @@ export const INITIAL_ALUNOS: Aluno[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
     cadastroData: '2024-07-20',
     modalidade: 'Presencial',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2024.2',
+    valorMensalidade: 380.0,
+    totalParcelas: 24,
+    parcelasPagas: 12,
+    primeiroVencimentoEmAberto: '25/07/2026',
+    diaVencimento: 25,
+    dataMatriculaFinanceira: '20/07/2024'
   },
   {
     id: 'student-9',
@@ -141,11 +207,18 @@ export const INITIAL_ALUNOS: Aluno[] = [
     whatsapp: '+55 (86) 99123-5566',
     email: 'leticia.guedes@sentidos.edu.br',
     statusFinanceiro: 'INADIMPLENTE',
-    valorPendente: 1450.00,
+    valorPendente: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=150',
     cadastroData: '2025-02-15',
     modalidade: 'Online',
-    cobrancaAutomatica: true
+    cobrancaAutomatica: true,
+    turma: '2025.1',
+    valorMensalidade: 480.0,
+    totalParcelas: 18,
+    parcelasPagas: 1,
+    primeiroVencimentoEmAberto: '05/03/2026',
+    diaVencimento: 5,
+    dataMatriculaFinanceira: '15/02/2025'
   },
   {
     id: 'student-10',
@@ -161,274 +234,115 @@ export const INITIAL_ALUNOS: Aluno[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150',
     cadastroData: '2025-03-25',
     modalidade: 'Presencial',
-    cobrancaAutomatica: true
-  }
-];;
-
-export const INITIAL_BOLETOS: Boleto[] = [
-  {
-    id: 'bil-150',
-    alunoId: 'student-1',
-    alunoNome: 'Mariana Silva Santos',
-    competencia: '05/2026',
-    vencimento: '10/05/2026',
-    valor: 450.00,
-    status: 'PAGO',
-    linhaDigitavel: '00190.00009 02738.162006 12345.678901 8 99830000045000',
-    nossoNumero: '25/0842231-9',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 2,
-    ultimoEnvio: '05/05/2026 10:15'
-  },
-  {
-    id: 'bil-151',
-    alunoId: 'student-1',
-    alunoNome: 'Mariana Silva Santos',
-    competencia: '06/2026',
-    vencimento: '10/06/2026',
-    valor: 450.00,
-    status: 'ABERTO',
-    linhaDigitavel: '00190.00009 02738.162006 12345.678901 8 99830000045000',
-    nossoNumero: '25/0842240-2',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 0
-  },
-  {
-    id: 'bil-152',
-    alunoId: 'student-2',
-    alunoNome: 'Ricardo Antunes de Moura',
-    competencia: '04/2026',
-    vencimento: '15/04/2026',
-    valor: 380.00,
-    status: 'ABERTO',
-    linhaDigitavel: '10490.12304 56780.221144 00012.339103 2 99120000038000',
-    nossoNumero: '10/0034a11-0',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 4,
-    ultimoEnvio: '18/04/2026 14:30'
-  },
-  {
-    id: 'bil-153',
-    alunoId: 'student-2',
-    alunoNome: 'Ricardo Antunes de Moura',
-    competencia: '05/2026',
-    vencimento: '15/05/2026',
-    valor: 380.00,
-    status: 'ABERTO',
-    linhaDigitavel: '10490.12304 56780.221144 00012.339115 2 99120000038000',
-    nossoNumero: '10/0034a12-8',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 1,
-    ultimoEnvio: '10/05/2026 09:00'
-  } as unknown as Boleto, // force compatible
-  {
-    id: 'bil-154',
-    alunoId: 'student-3',
-    alunoNome: 'Camila Guimarães Rocha',
-    competencia: '03/2026',
-    vencimento: '12/03/2026',
-    valor: 380.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '34190.12345 67890.123456 12345.678907 1 99010000038000',
-    nossoNumero: '09/4423190-2',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 5,
-    ultimoEnvio: '20/03/2026 16:22'
-  },
-  {
-    id: 'bil-155',
-    alunoId: 'student-3',
-    alunoNome: 'Camila Guimarães Rocha',
-    competencia: '04/2026',
-    vencimento: '12/04/2026',
-    valor: 380.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '34190.12345 67890.123456 12345.678908 1 99010000038000',
-    nossoNumero: '09/4423211-1',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 3,
-    ultimoEnvio: '15/04/2026 09:12'
-  },
-  {
-    id: 'bil-156',
-    alunoId: 'student-3',
-    alunoNome: 'Camila Guimarães Rocha',
-    competencia: '05/2026',
-    vencimento: '12/05/2026',
-    valor: 380.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '34190.12345 67890.123456 12345.678909 1 99010000038000',
-    nossoNumero: '09/4423240-5',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 2,
-    ultimoEnvio: '13/05/2026 10:45'
-  },
-  {
-    id: 'bil-157',
-    alunoId: 'student-4',
-    alunoNome: 'Bernardo Souza Nogueira',
-    competencia: '04/2026',
-    vencimento: '22/04/2026',
-    valor: 290.00,
-    status: 'PAGO',
-    linhaDigitavel: '10490.12304 56780.221144 00012.339592 2 99120000029000',
-    nossoNumero: '10/0122390-1',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 1,
-    ultimoEnvio: '18/04/2026 08:30'
-  },
-  {
-    id: 'bil-158',
-    alunoId: 'student-4',
-    alunoNome: 'Bernardo Souza Nogueira',
-    competencia: '05/2026',
-    vencimento: '22/05/2026',
-    valor: 290.00,
-    status: 'PAGO',
-    linhaDigitavel: '10490.12304 56780.221144 00012.339611 2 99120000029000',
-    nossoNumero: '10/0122412-2',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 1,
-    ultimoEnvio: '18/05/2026 08:30'
-  },
-  {
-    id: 'bil-159',
-    alunoId: 'student-5',
-    alunoNome: 'Fernanda Lima Oliveira',
-    competencia: '04/2026',
-    vencimento: '10/04/2026',
-    valor: 380.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '00190.00009 02738.162006 12345.673909 8 99830000038000',
-    nossoNumero: '25/0842911-3',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 4,
-    ultimoEnvio: '12/04/2026 15:40'
-  },
-  {
-    id: 'bil-160',
-    alunoId: 'student-5',
-    alunoNome: 'Fernanda Lima Oliveira',
-    competencia: '05/2026',
-    vencimento: '10/05/2026',
-    valor: 380.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '00190.00009 02738.162006 12345.673922 8 99830000038000',
-    nossoNumero: '25/0842940-7',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 3,
-    ultimoEnvio: '11/05/2026 11:32'
-  },
-  {
-    id: 'bil-161',
-    alunoId: 'student-7',
-    alunoNome: 'Ana Beatryz Fernandes',
-    competencia: '05/2026',
-    vencimento: '22/05/2026',
-    valor: 420.00,
-    status: 'ABERTO',
-    linhaDigitavel: '10490.12304 56780.221144 00012.339611 2 99120000042000',
-    nossoNumero: '10/0122904-5',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 1,
-    ultimoEnvio: '18/05/2026 09:20'
-  },
-  {
-    id: 'bil-162',
-    alunoId: 'student-9',
-    alunoNome: 'Letícia Guedes Cavalcante',
-    competencia: '03/2026',
-    vencimento: '05/03/2026',
-    valor: 480.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '34190.12345 67890.123456 12345.678907 1 99010000048000',
-    nossoNumero: '09/4423190-2',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 6,
-    ultimoEnvio: '10/03/2026 09:15'
-  },
-  {
-    id: 'bil-163',
-    alunoId: 'student-9',
-    alunoNome: 'Letícia Guedes Cavalcante',
-    competencia: '04/2026',
-    vencimento: '05/04/2026',
-    valor: 480.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '34190.12345 67890.123456 12345.678907 1 99010000048000',
-    nossoNumero: '09/4423190-3',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 4,
-    ultimoEnvio: '10/04/2026 09:30'
-  },
-  {
-    id: 'bil-164',
-    alunoId: 'student-9',
-    alunoNome: 'Letícia Guedes Cavalcante',
-    competencia: '05/2026',
-    vencimento: '05/05/2026',
-    valor: 490.00,
-    status: 'VENCIDO',
-    linhaDigitavel: '34190.12345 67890.123456 12345.678907 1 99010000049000',
-    nossoNumero: '09/4423190-4',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 2,
-    ultimoEnvio: '07/05/2026 14:15'
-  },
-  {
-    id: 'bil-165',
-    alunoId: 'student-10',
-    alunoNome: 'Thiago Martins Fonseca',
-    competencia: '05/2026',
-    vencimento: '25/05/2026',
-    valor: 380.00,
-    status: 'PAGO',
-    linhaDigitavel: '00190.00009 02738.162006 12345.673922 8 99830000038000',
-    nossoNumero: '25/0842991-0',
-    pdfUrl: '#',
-    enviadoWhatsAppCount: 1,
-    ultimoEnvio: '20/05/2026 11:20'
+    cobrancaAutomatica: true,
+    turma: '2025.2',
+    valorMensalidade: 380.0,
+    totalParcelas: 18,
+    parcelasPagas: 8,
+    primeiroVencimentoEmAberto: '25/07/2026',
+    diaVencimento: 25,
+    dataMatriculaFinanceira: '25/03/2025'
   }
 ];
+
+// Gera as parcelas em aberto de cada matrícula financeira demo.
+const parcelasGeradas: Parcela[] = INITIAL_ALUNOS.flatMap(a => generateParcelas(a, [], 'MATRICULA'));
+
+const historicoSeed: ParcelaHistorico[] = [];
+
+// Enriquecimento do demo: alguns pagamentos e uma negociação recuperada.
+const marcarPaga = (p: Parcela | undefined, dataPagamento: string) => {
+  if (!p) return;
+  p.status = 'PAGO';
+  p.dataPagamento = dataPagamento;
+  p.atualizadoEm = new Date().toISOString();
+  historicoSeed.push(novoHistorico(p.id, p.alunoId, 'Pagamento registrado', `Parcela ${p.numeroParcela}/${p.totalParcelas} quitada`));
+};
+
+const firstParcela = (alunoId: string, numero: number) =>
+  parcelasGeradas.find(p => p.alunoId === alunoId && p.numeroParcela === numero);
+
+// Mariana: 1ª parcela em aberto paga → fica em dia (demais futuras).
+marcarPaga(firstParcela('student-1', 8), '10/06/2026');
+
+// Bernardo e Gustavo já com a primeira em aberto paga.
+marcarPaga(firstParcela('student-4', 6), '20/07/2026');
+marcarPaga(firstParcela('student-8', 13), '24/07/2026');
+
+// Ricardo: negociação concluída com sucesso (Receita Recuperada).
+const ricardoAtrasada = firstParcela('student-2', 4);
+if (ricardoAtrasada) {
+  ricardoAtrasada.status = 'NEGOCIADO';
+  ricardoAtrasada.atualizadoEm = new Date().toISOString();
+  historicoSeed.push(novoHistorico(ricardoAtrasada.id, ricardoAtrasada.alunoId, 'Status alterado para NEGOCIADO', 'Acordo de parcelamento criado'));
+  // Parcela renegociada paga: original 380 → acordado 280 (recuperado).
+  const nowIso = new Date().toISOString();
+  const recuperada: Parcela = {
+    id: `parc-acordo-${ricardoAtrasada.alunoId}`,
+    alunoId: ricardoAtrasada.alunoId,
+    alunoNome: ricardoAtrasada.alunoNome,
+    curso: ricardoAtrasada.curso,
+    turma: ricardoAtrasada.turma,
+    polo: ricardoAtrasada.polo,
+    numeroParcela: 100,
+    totalParcelas: ricardoAtrasada.totalParcelas,
+    competencia: '06/2026',
+    vencimento: '10/06/2026',
+    valorOriginal: 380.0,
+    valorAtual: 280.0,
+    status: 'PAGO',
+    origem: 'NEGOCIACAO',
+    dataPagamento: '09/06/2026',
+    observacoes: 'Acordo de quitação com desconto',
+    enviadoWhatsAppCount: 0,
+    criadoEm: nowIso,
+    atualizadoEm: nowIso
+  };
+  parcelasGeradas.push(recuperada);
+  historicoSeed.push(novoHistorico(recuperada.id, recuperada.alunoId, 'Acordo concluído', 'Pagamento recuperado via negociação'));
+}
+
+export const INITIAL_PARCELAS: Parcela[] = parcelasGeradas;
+export const INITIAL_PARCELA_HISTORICO: ParcelaHistorico[] = historicoSeed;
 
 export const INITIAL_WHATSAPP_MENSAGENS: WhatsAppMensagem[] = [
   {
     id: 'msg-1',
     alunoId: 'student-2',
     tipo: 'SISTEMA',
-    texto: 'Olá Ricardo Antunes de Moura! Lembramos que o seu boleto de Pós-Graduação com vencimento em 15/05/2026 no valor de R$ 380,00 já está disponível para pagamento. Linha Digitável: 10490.12304 56780.221144 00012.339115 2 99120000038000. Evite juros!',
-    dataHora: '2026-05-10T09:00:00Z',
+    texto: 'Olá Ricardo Antunes de Moura 👋 Identificamos que sua mensalidade encontra-se em aberto. Parcela: 04/12, Vencimento: 15/05/2026, Valor: R$ 380,00. Caso já tenha efetuado o pagamento, desconsidere esta mensagem.',
+    dataHora: '2026-05-16T09:00:00Z',
     statusEnvio: 'LIDO'
   },
   {
     id: 'msg-2',
     alunoId: 'student-2',
     tipo: 'HUMANO_CLIENTE',
-    texto: 'Bom dia! Gostaria de pedir se há possibilidade de adiar o vencimento deste boleto de maio para o dia 25. O meu pagamento desse mês vai atrasar.',
-    dataHora: '2026-05-10T10:15:00Z',
+    texto: 'Bom dia! Gostaria de pedir se há possibilidade de parcelar essa mensalidade. O meu pagamento desse mês vai atrasar.',
+    dataHora: '2026-05-16T10:15:00Z',
     statusEnvio: 'ENTREGUE'
   },
   {
     id: 'msg-3',
     alunoId: 'student-2',
     tipo: 'HUMANO_AGENTE',
-    texto: 'Olá Ricardo! Sou o atendente financeiro do Instituto Sentidos. Verifiquei aqui no sistema. Podemos prorrogar até o dia 25 sem aplicação de juros contratuais, como cortesia para você.',
-    dataHora: '2026-05-10T10:32:00Z',
+    texto: 'Olá Ricardo! Sou o atendente financeiro do Instituto Sentidos. Conseguimos registrar um acordo com desconto para quitação. Vou te enviar os detalhes.',
+    dataHora: '2026-05-16T10:32:00Z',
     statusEnvio: 'LIDO'
   },
   {
     id: 'msg-4',
     alunoId: 'student-2',
     tipo: 'HUMANO_CLIENTE',
-    texto: 'Nossa, muito obrigado mesmo! Fico no aguardo do novo boleto então.',
-    dataHora: '2026-05-10T11:01:00Z',
+    texto: 'Nossa, muito obrigado mesmo! Fico no aguardo então.',
+    dataHora: '2026-05-16T11:01:00Z',
     statusEnvio: 'ENTREGUE'
   },
   {
     id: 'msg-5',
     alunoId: 'student-3',
     tipo: 'SISTEMA',
-    texto: 'ALERTA DE INADIMPLÊNCIA: Camila Guimarães Rocha, identificamos pendências financeiras em seu cadastro de Pós-Graduação referente aos meses 03/2026, 04/2026 e 05/2026 no valor total acumulado de R$ 1.140,00. Evite o bloqueio temporário de acesso ao portal do aluno. Regularize em sentidos.edu.br/financeiro.',
+    texto: 'ALERTA DE INADIMPLÊNCIA: Camila Guimarães Rocha, identificamos parcelas em aberto referentes ao seu curso de Psicopedagogia. Evite restrições e regularize sua situação. Para negociar, responda 1️⃣.',
     dataHora: '2026-05-13T10:45:00Z',
     statusEnvio: 'ENTREGUE'
   }
@@ -437,41 +351,101 @@ export const INITIAL_WHATSAPP_MENSAGENS: WhatsAppMensagem[] = [
 export const INITIAL_COBRANCA_REGRAS: CobrancaRegra[] = [
   {
     id: 'rule-1',
-    titulo: 'Lembrete Amigável (Pré-vencimento)',
-    descricao: 'Envia um lembrete com a linha digitável e PDF cinco dias antes de o boleto vencer.',
-    diasGatilho: -5,
+    titulo: 'Lembrete Amigável (7 dias antes)',
+    descricao: 'Envia um lembrete da parcela sete dias antes do vencimento.',
+    diasGatilho: -7,
     tipoGatilho: 'ANTES',
-    mensagemTemplate: 'Olá, {nome_aluno}! Lembramos que o seu boleto de {curso} no valor de {valor_boleto} vence em {vencimento_boleto}. Você pode efetuar o pagamento lendo a linha digitável: {linha_digitavel}. Atenciosamente, Setor Financeiro Instituto Sentidos / FAEPI.',
+    mensagemTemplate: 'Olá, {nome_aluno} 👋 Lembramos que a parcela {parcela} do curso {curso} no valor de {valor} vence em {vencimento}. Caso já tenha pago, desconsidere. Setor Financeiro Instituto Sentidos / FAEPI.',
     ativo: true,
     horarioEnvio: '09:00'
   },
   {
     id: 'rule-2',
-    titulo: 'Notificação do Dia de Vencimento',
-    descricao: 'Dispara no dia exato do vencimento do boleto no início da manhã.',
-    diasGatilho: 0,
-    tipoGatilho: 'DIA_VENCIMENTO',
-    mensagemTemplate: 'Atenção, {nome_aluno}: Hoje é o dia de vencimento da mensalidade de {curso} (Competência {competencia}) no valor de {valor_boleto}. Acesse seu PDF no link: {link_pdf} ou utilize o código: {linha_digitavel}. Caso já tenha pago, por favor desconsidere.',
+    titulo: 'Reforço (3 dias antes)',
+    descricao: 'Reforço de lembrete três dias antes do vencimento.',
+    diasGatilho: -3,
+    tipoGatilho: 'ANTES',
+    mensagemTemplate: 'Olá, {nome_aluno}! Faltam poucos dias para o vencimento da parcela {parcela} ({valor}) em {vencimento}. Estamos à disposição para qualquer dúvida.',
+    ativo: true,
+    horarioEnvio: '09:00'
+  },
+  {
+    id: 'rule-3',
+    titulo: 'Aviso Final (1 dia antes)',
+    descricao: 'Aviso final um dia antes do vencimento.',
+    diasGatilho: -1,
+    tipoGatilho: 'ANTES',
+    mensagemTemplate: 'Atenção, {nome_aluno}: amanhã vence a parcela {parcela} do curso {curso} no valor de {valor} ({vencimento}). Caso já tenha efetuado o pagamento, desconsidere.',
     ativo: true,
     horarioEnvio: '08:30'
   },
   {
-    id: 'rule-3',
-    titulo: 'Aviso Imediato de Atraso',
-    descricao: 'Notifica o aluno um dia útil após o vencimento não identificado.',
+    id: 'rule-4',
+    titulo: 'Aviso Leve (1 dia após)',
+    descricao: 'Notifica o aluno um dia após o vencimento não identificado.',
     diasGatilho: 1,
     tipoGatilho: 'DEPOIS',
-    mensagemTemplate: 'Olá, {nome_aluno}. Identificamos que o boleto de {curso} no valor de {valor_boleto}, vencido em {vencimento_boleto}, ainda consta em aberto no nosso banco de dados. Para pagar sem multas elevadas, utilize este código atualizado hoje: {linha_digitavel}. Evite restrições!',
+    mensagemTemplate: 'Olá, {nome_aluno}. Identificamos que a parcela {parcela} ({valor}), vencida em {vencimento}, ainda consta em aberto. Para regularizar responda 1️⃣ Negociar.',
     ativo: true,
     horarioEnvio: '09:30'
   },
   {
-    id: 'rule-4',
-    titulo: 'Notificação de Inadimplência Crítica',
-    descricao: 'Disparada após 15 dias de atraso. Alerta sobre restrição acadêmica e cadastral.',
+    id: 'rule-5',
+    titulo: 'Cobrança Moderada (5 dias após)',
+    descricao: 'Cobrança cinco dias após o vencimento.',
+    diasGatilho: 5,
+    tipoGatilho: 'DEPOIS',
+    mensagemTemplate: 'Olá, {nome_aluno}. A parcela {parcela} ({valor}) está em atraso desde {vencimento}. Regularize para evitar acúmulo de pendências. Responda 1️⃣ Negociar ou 2️⃣ Atendimento Humano.',
+    ativo: true,
+    horarioEnvio: '09:30'
+  },
+  {
+    id: 'rule-6',
+    titulo: 'Negociação (15 dias após)',
+    descricao: 'Oferece negociação após 15 dias de atraso.',
     diasGatilho: 15,
     tipoGatilho: 'DEPOIS',
-    mensagemTemplate: 'COMUNICADO IMPORTANTE: {nome_aluno}, seu cadastro de estudante para o curso {curso} apresenta pendência financeira grave de 15 dias no valor de {valor_boleto}. Solicitamos contato urgente no telefone (86) 3211-0012 para negociarmos sua pendência com condições facilitadas e evitar a suspensão de novos módulos.',
+    mensagemTemplate: 'COMUNICADO: {nome_aluno}, a parcela {parcela} ({valor}) do curso {curso} está com 15 dias de atraso. Temos condições especiais de negociação. Responda 1️⃣ Negociar.',
+    ativo: true,
+    horarioEnvio: '14:00'
+  },
+  {
+    id: 'rule-7',
+    titulo: 'Alerta Administrativo (30 dias após)',
+    descricao: 'Alerta administrativo após 30 dias de atraso.',
+    diasGatilho: 30,
+    tipoGatilho: 'DEPOIS',
+    mensagemTemplate: 'COMUNICADO IMPORTANTE: {nome_aluno}, a parcela {parcela} ({valor}) encontra-se com 30 dias de atraso. Solicitamos contato urgente para regularização e negociação.',
+    ativo: false,
+    horarioEnvio: '14:00'
+  },
+  {
+    id: 'rule-8',
+    titulo: 'Reforço Administrativo (45 dias após)',
+    descricao: 'Reforço administrativo após 45 dias de atraso.',
+    diasGatilho: 45,
+    tipoGatilho: 'DEPOIS',
+    mensagemTemplate: 'ATENÇÃO {nome_aluno}: a parcela {parcela} ({valor}) está com 45 dias de atraso. Entre em contato para negociar e evitar restrições acadêmicas.',
+    ativo: false,
+    horarioEnvio: '14:00'
+  },
+  {
+    id: 'rule-9',
+    titulo: 'Notificação Crítica (60 dias após)',
+    descricao: 'Notificação crítica após 60 dias de atraso.',
+    diasGatilho: 60,
+    tipoGatilho: 'DEPOIS',
+    mensagemTemplate: 'NOTIFICAÇÃO CRÍTICA: {nome_aluno}, a parcela {parcela} ({valor}) atingiu 60 dias de atraso. É imprescindível regularizar ou formalizar um acordo. Responda 2️⃣ Atendimento Humano.',
+    ativo: false,
+    horarioEnvio: '14:00'
+  },
+  {
+    id: 'rule-10',
+    titulo: 'Última Tentativa (90 dias após)',
+    descricao: 'Última tentativa de cobrança após 90 dias de atraso.',
+    diasGatilho: 90,
+    tipoGatilho: 'DEPOIS',
+    mensagemTemplate: 'ÚLTIMA TENTATIVA: {nome_aluno}, a parcela {parcela} ({valor}) está com 90 dias de atraso. Esta é a última notificação automática antes do encaminhamento administrativo.',
     ativo: false,
     horarioEnvio: '14:00'
   }
@@ -489,7 +463,7 @@ export const INITIAL_CRM_CONFIG: CrmConfig = {
         'Lead de Cobrança Criado',
         'Contato Inicial Efetuado',
         'Proposta de Negociação Enviada',
-        'Acordo Realizado / Aguardando Boleto',
+        'Acordo Realizado',
         'Perda / Aluno Desistente',
         'Sucesso / Pago'
       ]
@@ -522,7 +496,7 @@ export const INITIAL_LOGS_ATIVIDADE: LogAtividade[] = [
     timestamp: '2026-05-22 12:00:44',
     tipo: 'IMPORTACAO',
     usuario: 'adm.financeiro',
-    detalhe: 'Importação de lote de boletos bancários da FAEPI. 142 registros lidos, 0 erros.',
+    detalhe: 'Importação de matrículas financeiras via CSV. 142 alunos lidos, parcelas geradas automaticamente.',
     sucesso: true
   },
   {

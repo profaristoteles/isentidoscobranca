@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readDB, writeDB, initDb, getInitialData } from './database';
+import { readDB, writeDB, initDb, getInitialData, backupDatabaseFile } from './database';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,7 +74,7 @@ app.get('/api/status', async (req, res) => {
       database: 'conectado',
       stats: {
         alunos: db.alunos.length,
-        boletos: db.boletos.length,
+        parcelas: db.parcelas.length,
         mensagens: db.mensagens.length
       }
     });
@@ -98,8 +98,12 @@ app.get('/api/db', async (req, res) => {
 });
 
 // Reset database
-app.post('/api/reset', async (req, res) => {
+app.post('/api/reset', async (_req, res) => {
   console.log('[Sentidos Cobranças] Recebida requisição /api/reset. Reiniciando banco de dados para os valores padrão...');
+  // Ajuste F7: sem backup válido, a operação não prossegue.
+  if (!backupDatabaseFile()) {
+    return res.status(500).json({ success: false, error: 'Backup de segurança falhou. Operação de reset abortada para evitar perda de dados.' });
+  }
   try {
     const initial = getInitialData();
     await writeDB(initial);
@@ -115,12 +119,16 @@ app.post('/api/save-all', async (req, res) => {
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ success: false, message: 'Dados inválidos' });
   }
-  const required = ['alunos', 'boletos', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'users'];
+  const required = ['alunos', 'parcelas', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'users'];
   const hasRequired = required.every(key => key in data);
   if (!hasRequired) {
     return res.status(400).json({ success: false, message: 'Dados incompletos para persistência' });
   }
-  console.log(`[Sentidos Cobranças] Recebida requisição /api/save-all. Salvando ${data.alunos.length} alunos, ${data.boletos.length} boletos...`);
+  // parcelaHistorico é opcional para compatibilidade; garante array.
+  if (!('parcelaHistorico' in data)) {
+    data.parcelaHistorico = [];
+  }
+  console.log(`[Sentidos Cobranças] Recebida requisição /api/save-all. Salvando ${data.alunos.length} alunos, ${data.parcelas.length} parcelas...`);
   try {
     await writeDB(data);
     res.json({ success: true, message: 'Banco de dados salvo com sucesso!' });
@@ -176,44 +184,44 @@ app.put('/api/alunos/:id', async (req, res) => {
   }
 });
 
-// Boletos CRUD
-app.get('/api/boletos', async (req, res) => {
+// Parcelas CRUD
+app.get('/api/parcelas', async (_req, res) => {
   try {
     const db = await readDB();
-    res.json(db.boletos);
+    res.json(db.parcelas);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.post('/api/boletos', async (req, res) => {
+app.post('/api/parcelas', async (req, res) => {
   try {
     const db = await readDB();
-    const novoBoleto = req.body;
-    const idx = db.boletos.findIndex((b: any) => b.id === novoBoleto.id);
+    const novaParcela = req.body;
+    const idx = db.parcelas.findIndex((p: any) => p.id === novaParcela.id);
     if (idx > -1) {
-      db.boletos[idx] = novoBoleto;
+      db.parcelas[idx] = novaParcela;
     } else {
-      db.boletos.push(novoBoleto);
+      db.parcelas.push(novaParcela);
     }
     await writeDB(db);
-    res.json({ success: true, data: novoBoleto });
+    res.json({ success: true, data: novaParcela });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.put('/api/boletos/:id', async (req, res) => {
+app.put('/api/parcelas/:id', async (req, res) => {
   try {
     const db = await readDB();
     const id = req.params.id;
-    const idx = db.boletos.findIndex((b: any) => b.id === id);
+    const idx = db.parcelas.findIndex((p: any) => p.id === id);
     if (idx > -1) {
-      db.boletos[idx] = { ...db.boletos[idx], ...req.body };
+      db.parcelas[idx] = { ...db.parcelas[idx], ...req.body };
       await writeDB(db);
-      res.json({ success: true, data: db.boletos[idx] });
+      res.json({ success: true, data: db.parcelas[idx] });
     } else {
-      res.status(404).json({ success: false, message: 'Boleto não encontrado' });
+      res.status(404).json({ success: false, message: 'Parcela não encontrada' });
     }
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -418,12 +426,17 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
 });
 
 // Clean database for production (keep regras, crmConfig, and polos)
-app.post('/api/clear-db', async (req, res) => {
-  console.log('[Sentidos Cobranças] Recebida requisição /api/clear-db. Limpando dados de alunos, boletos e mensagens para produção...');
+app.post('/api/clear-db', async (_req, res) => {
+  console.log('[Sentidos Cobranças] Recebida requisição /api/clear-db. Limpando dados de alunos, parcelas e mensagens para produção...');
+  // Ajuste F7: sem backup válido, a operação não prossegue.
+  if (!backupDatabaseFile()) {
+    return res.status(500).json({ success: false, error: 'Backup de segurança falhou. Operação de limpeza abortada para evitar perda de dados.' });
+  }
   try {
     const db = await readDB();
     db.alunos = [];
-    db.boletos = [];
+    db.parcelas = [];
+    db.parcelaHistorico = [];
     db.mensagens = [];
     db.logs = [
       {

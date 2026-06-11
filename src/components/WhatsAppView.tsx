@@ -247,7 +247,7 @@ Diretrizes:
     if (msgLower.includes('parcelar') || msgLower.includes('acordo') || msgLower.includes('negociar') || msgLower.includes('consigo pagar') || msgLower.includes('dividir')) {
       return `Olá! Compreendemos a sua situação. Nós conseguimos fazer um acordo em parcelas de até 4 vezes sem juros para quitação de seu saldo pendente de R$ ${aluno.valorPendente.toFixed(2)}. Gostaria de formalizar essa proposta?`;
     }
-    return `Olá! Sou a Sentia, assistente virtual. Para agilizar o seu atendimento financeiro, você deseja simular um parcelamento ou nos enviar o comprovante de um boleto já pago?`;
+    return `Olá! Sou a Sentia, assistente virtual. Para agilizar o seu atendimento financeiro, você deseja negociar uma parcela em aberto ou nos enviar o comprovante de uma mensalidade já paga?`;
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -485,11 +485,11 @@ Diretrizes:
 
             <div className="flex flex-wrap gap-3 justify-center mt-2">
               <button
-                onClick={() => onSetTab('importações')}
+                onClick={() => onSetTab('alunos')}
                 className="flex items-center gap-2 bg-[#03045e] hover:bg-[#03045e]/90 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition shadow-sm cursor-pointer"
               >
                 <Upload className="h-4 w-4" />
-                Importar Alunos (Planilha)
+                Cadastrar / Importar Alunos
               </button>
               <button
                 onClick={() => onSetTab('alunos')}
@@ -614,7 +614,7 @@ Diretrizes:
                     <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 text-xs">
                       <MessageSquare className="h-8 w-8 text-gray-300 mb-1" />
                       <p className="font-semibold text-gray-500">Nenhum diálogo ativo com o WhatsApp</p>
-                      <p className="text-[10px] text-gray-400">Clique em "Cobrar" na lista de boletos para inicializar ou envie uma mensagem direta abaixo.</p>
+                      <p className="text-[10px] text-gray-400">Clique em "Cobrar" na lista de parcelas para inicializar ou envie uma mensagem direta abaixo.</p>
                     </div>
                   )}
                 </div>

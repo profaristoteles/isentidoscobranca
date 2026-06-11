@@ -1,4 +1,5 @@
-export type StatusFinanceiro = 'PAGO' | 'ABERTO' | 'VENCIDO' | 'NEGOCIADO';
+export type StatusParcela = 'PENDENTE' | 'PAGO' | 'ATRASADO' | 'NEGOCIADO' | 'CANCELADO' | 'ISENTO';
+export type OrigemParcela = 'MATRICULA' | 'IMPORTACAO_CSV' | 'NEGOCIACAO' | 'MANUAL';
 
 export interface Aluno {
   id: string;
@@ -15,21 +16,49 @@ export interface Aluno {
   cadastroData: string;
   modalidade: 'Presencial' | 'Online';
   cobrancaAutomatica?: boolean;
+
+  // Matrícula financeira (contrato)
+  turma?: string;
+  valorMensalidade?: number;
+  totalParcelas?: number;
+  parcelasPagas?: number;
+  primeiroVencimentoEmAberto?: string; // DD/MM/AAAA (pode ser data passada)
+  diaVencimento?: number;
+  dataMatriculaFinanceira?: string; // DD/MM/AAAA
+  observacoes?: string;
 }
 
-export interface Boleto {
+export interface Parcela {
   id: string;
   alunoId: string;
   alunoNome: string;
-  competencia: string;
-  vencimento: string;
-  valor: number;
-  status: StatusFinanceiro;
-  linhaDigitavel: string;
-  nossoNumero: string;
-  pdfUrl: string;
+  curso: string; // denormalizado do aluno
+  turma: string;
+  polo: string;
+  numeroParcela: number; // 8
+  totalParcelas: number; // 18 → exibe "08/18"
+  competencia: string; // "06/2026"
+  vencimento: string; // "10/06/2026"
+  valorOriginal: number; // nunca muda
+  valorAtual: number; // = valorOriginal até negociação
+  status: StatusParcela;
+  origem: OrigemParcela;
+  dataPagamento?: string;
+  observacoes?: string;
   enviadoWhatsAppCount: number;
   ultimoEnvio?: string;
+  criadoEm: string; // ISO
+  atualizadoEm: string; // ISO
+}
+
+export interface ParcelaHistorico {
+  id: string;
+  parcelaId: string;
+  alunoId: string;
+  data: string; // ISO
+  acao: string; // "Parcela criada", "Cobrança enviada", "Status alterado para NEGOCIADO"...
+  observacao?: string;
+  usuario?: string;
 }
 
 export interface WhatsAppMensagem {
@@ -86,4 +115,3 @@ export interface Colaborador {
   role: 'Administrador' | 'Financeiro' | 'Secretaria';
   active: boolean;
 }
-

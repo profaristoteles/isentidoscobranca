@@ -565,7 +565,7 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
             </span>
             <h4 className="text-xs font-bold mt-1">Como funciona a quitação?</h4>
             <p className="text-[10.5px] text-gray-300 leading-relaxed font-sans">
-              No momento em que o aluno realiza o PIX ou transação bancária do boleto correspondente, a nossa API captura o retorno de pagamentos e automaticamente atualiza a tag dele no CRM do LeadConnector para <code className="text-white font-mono bg-white/10 px-1 py-0.5 rounded">{"faepi-sentidos-pago"}</code> e remove do pipeline de atrasos.
+              No momento em que o aluno realiza o PIX ou transação bancária da parcela correspondente, a nossa API captura o retorno de pagamentos e automaticamente atualiza a tag dele no CRM do LeadConnector para <code className="text-white font-mono bg-white/10 px-1 py-0.5 rounded">{"faepi-sentidos-pago"}</code> e remove do pipeline de atrasos.
             </p>
           </div>
         </div>

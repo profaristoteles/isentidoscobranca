@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
-  Info,
-  Sparkles,
-  RefreshCw,
-  XSquare
+import {
+  X,
+  CheckCircle,
+  AlertTriangle,
+  XCircle
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -18,45 +14,65 @@ import LoginScreen from './components/LoginScreen';
 import DashboardView from './components/DashboardView';
 import StudentsView from './components/StudentsView';
 import StudentDetailView from './components/StudentDetailView';
-import BoletosView from './components/BoletosView';
-import BoletosImportView from './components/BoletosImportView';
+import ParcelasView from './components/ParcelasView';
 import CobrancasRulesView from './components/CobrancasRulesView';
 import WhatsAppView from './components/WhatsAppView';
 import CRMView from './components/CRMView';
 import ConfiguracoesView from './components/ConfiguracoesView';
-import { 
-  isEvolutionConfigured, 
-  checkConnectionStatus, 
-  sendTextMessage 
+import {
+  isEvolutionConfigured,
+  checkConnectionStatus,
+  sendTextMessage
 } from './services/whatsappService';
 import { safeGetItem, safeParseJson, safeRemoveItem, safeSetItem } from './utils/storage';
 
 // Models & Dummy Dataset loaders
-import { 
-  Aluno, 
-  Boleto, 
-  WhatsAppMensagem, 
-  CobrancaRegra, 
-  CrmConfig, 
+import {
+  Aluno,
+  Parcela,
+  ParcelaHistorico,
+  WhatsAppMensagem,
+  CobrancaRegra,
+  CrmConfig,
   LogAtividade,
   Colaborador
 } from './types';
-import { 
-  INITIAL_ALUNOS, 
-  INITIAL_BOLETOS, 
-  INITIAL_WHATSAPP_MENSAGENS, 
-  INITIAL_COBRANCA_REGRAS, 
-  INITIAL_CRM_CONFIG, 
+import {
+  INITIAL_ALUNOS,
+  INITIAL_PARCELAS,
+  INITIAL_PARCELA_HISTORICO,
+  INITIAL_WHATSAPP_MENSAGENS,
+  INITIAL_COBRANCA_REGRAS,
+  INITIAL_CRM_CONFIG,
   INITIAL_LOGS_ATIVIDADE,
   INITIAL_POLOS,
   INITIAL_USERS
 } from './mockData';
+import {
+  generateParcelas,
+  getStatusEfetivo,
+  podeReceberCobranca,
+  formatParcela,
+  novoHistorico
+} from './utils/parcelas';
 
 const isSameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 const setIfChanged = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, nextValue: T) => {
   setter(prev => isSameJson(prev, nextValue) ? prev : nextValue);
 };
+
+const nowIso = () => new Date().toISOString();
+const logTimestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+// Render a régua/cobrança template using parcela tokens.
+const buildCobrancaText = (template: string, aluno: Aluno, parcela: Parcela) =>
+  template
+    .replace(/{nome_aluno}/g, aluno.nome)
+    .replace(/{curso}/g, aluno.curso)
+    .replace(/{valor}/g, `R$ ${parcela.valorAtual.toFixed(2)}`)
+    .replace(/{vencimento}/g, parcela.vencimento)
+    .replace(/{parcela}/g, formatParcela(parcela));
 
 export default function App() {
   // Session User State
@@ -78,8 +94,11 @@ export default function App() {
   const [alunos, setAlunos] = useState<Aluno[]>(() => {
     return safeParseJson(safeGetItem('sentidos_alunos'), INITIAL_ALUNOS);
   });
-  const [boletos, setBoletos] = useState<Boleto[]>(() => {
-    return safeParseJson(safeGetItem('sentidos_boletos'), INITIAL_BOLETOS);
+  const [parcelas, setParcelas] = useState<Parcela[]>(() => {
+    return safeParseJson(safeGetItem('sentidos_parcelas'), INITIAL_PARCELAS);
+  });
+  const [parcelaHistorico, setParcelaHistorico] = useState<ParcelaHistorico[]>(() => {
+    return safeParseJson(safeGetItem('sentidos_parcelaHistorico'), INITIAL_PARCELA_HISTORICO);
   });
   const [mensagens, setMensagens] = useState<WhatsAppMensagem[]>(() => {
     return safeParseJson(safeGetItem('sentidos_mensagens'), INITIAL_WHATSAPP_MENSAGENS);
@@ -98,43 +117,19 @@ export default function App() {
   });
 
   // LocalStorage sync effects
-  useEffect(() => {
-    safeSetItem('sentidos_polos', JSON.stringify(polos));
-  }, [polos]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_alunos', JSON.stringify(alunos));
-  }, [alunos]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_boletos', JSON.stringify(boletos));
-  }, [boletos]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_mensagens', JSON.stringify(mensagens));
-  }, [mensagens]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_regras', JSON.stringify(regras));
-  }, [regras]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_crmConfig', JSON.stringify(crmConfig));
-  }, [crmConfig]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_logs', JSON.stringify(logs));
-  }, [logs]);
-
-  useEffect(() => {
-    safeSetItem('sentidos_users', JSON.stringify(users));
-  }, [users]);
+  useEffect(() => { safeSetItem('sentidos_polos', JSON.stringify(polos)); }, [polos]);
+  useEffect(() => { safeSetItem('sentidos_alunos', JSON.stringify(alunos)); }, [alunos]);
+  useEffect(() => { safeSetItem('sentidos_parcelas', JSON.stringify(parcelas)); }, [parcelas]);
+  useEffect(() => { safeSetItem('sentidos_parcelaHistorico', JSON.stringify(parcelaHistorico)); }, [parcelaHistorico]);
+  useEffect(() => { safeSetItem('sentidos_mensagens', JSON.stringify(mensagens)); }, [mensagens]);
+  useEffect(() => { safeSetItem('sentidos_regras', JSON.stringify(regras)); }, [regras]);
+  useEffect(() => { safeSetItem('sentidos_crmConfig', JSON.stringify(crmConfig)); }, [crmConfig]);
+  useEffect(() => { safeSetItem('sentidos_logs', JSON.stringify(logs)); }, [logs]);
+  useEffect(() => { safeSetItem('sentidos_users', JSON.stringify(users)); }, [users]);
 
   // Ref to prevent sync loop when polling updates from backend
   const skipSyncRef = useRef(false);
-  // Ref to block background polling when a local change is pending sync to the backend
   const pendingSyncRef = useRef(false);
-  // Ref to prevent sync when resetting/clearing database
   const isResettingRef = useRef(false);
 
   // Initial Fetch from backend DB with LocalStorage fallback
@@ -146,14 +141,15 @@ export default function App() {
           const data = await response.json();
           skipSyncRef.current = true;
           if (data.alunos) setIfChanged(setAlunos, data.alunos);
-          if (data.boletos) setIfChanged(setBoletos, data.boletos);
+          if (data.parcelas) setIfChanged(setParcelas, data.parcelas);
+          if (data.parcelaHistorico) setIfChanged(setParcelaHistorico, data.parcelaHistorico);
           if (data.mensagens) setIfChanged(setMensagens, data.mensagens);
           if (data.regras) setIfChanged(setRegras, data.regras);
           if (data.crmConfig) setIfChanged(setCrmConfig, data.crmConfig);
           if (data.logs) setIfChanged(setLogs, data.logs);
           if (data.polos) setIfChanged(setPolos, data.polos);
           if (data.users) setIfChanged(setUsers, data.users);
-          
+
           setIsUsingApi(true);
           console.log('[Sentidos Cobranças] Banco de dados carregado com sucesso do backend.');
         } else {
@@ -168,26 +164,23 @@ export default function App() {
     fetchDB();
   }, []);
 
-  // Poll database updates from backend every 5 seconds to load webhook messages/logs
+  // Poll database updates from backend every 5 seconds
   useEffect(() => {
     if (!isUsingApi) return;
-    
+
     const pollUpdates = async () => {
-      // If client has pending local modifications or a reset/clear is in progress, skip polling
-      if (pendingSyncRef.current || isResettingRef.current) {
-        return;
-      }
+      if (pendingSyncRef.current || isResettingRef.current) return;
 
       try {
         const response = await fetch('/api/db');
         if (response.ok) {
-          // Re-check after await in case a reset/clear started while we were fetching
           if (isResettingRef.current) return;
 
           const data = await response.json();
           skipSyncRef.current = true;
           if (data.alunos) setIfChanged(setAlunos, data.alunos);
-          if (data.boletos) setIfChanged(setBoletos, data.boletos);
+          if (data.parcelas) setIfChanged(setParcelas, data.parcelas);
+          if (data.parcelaHistorico) setIfChanged(setParcelaHistorico, data.parcelaHistorico);
           if (data.mensagens) setIfChanged(setMensagens, data.mensagens);
           if (data.regras) setIfChanged(setRegras, data.regras);
           if (data.crmConfig) setIfChanged(setCrmConfig, data.crmConfig);
@@ -214,11 +207,9 @@ export default function App() {
       return;
     }
 
-    pendingSyncRef.current = true; // Block polling while sync is pending
+    pendingSyncRef.current = true;
 
     const syncToBackend = async () => {
-      // CRITICAL: Re-check isResettingRef right before sending data.
-      // This prevents already-scheduled timeouts from overwriting a cleared database.
       if (isResettingRef.current) {
         pendingSyncRef.current = false;
         return;
@@ -227,19 +218,18 @@ export default function App() {
       try {
         const response = await fetch('/api/save-all', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             alunos,
-            boletos,
+            parcelas,
+            parcelaHistorico,
             mensagens,
             regras,
             crmConfig,
             logs,
             polos,
-            users,
-          }),
+            users
+          })
         });
         if (!response.ok) {
           console.error('[Sentidos Cobranças] Falha ao sincronizar dados no backend.');
@@ -247,18 +237,17 @@ export default function App() {
       } catch (err) {
         console.error('[Sentidos Cobranças] Erro de rede ao sincronizar dados no backend.', err);
       } finally {
-        pendingSyncRef.current = false; // Unblock polling after sync finishes
+        pendingSyncRef.current = false;
       }
     };
 
     const timeoutId = setTimeout(syncToBackend, 500);
     return () => clearTimeout(timeoutId);
-  }, [alunos, boletos, mensagens, regras, crmConfig, logs, polos, users, dbLoaded, isUsingApi]);
+  }, [alunos, parcelas, parcelaHistorico, mensagens, regras, crmConfig, logs, polos, users, dbLoaded, isUsingApi]);
 
   // Connection states
   const [whatsappOnline, setWhatsappOnline] = useState<boolean>(true);
 
-  // Check Evolution API connection on mount
   useEffect(() => {
     const checkStatusOnMount = async () => {
       if (isEvolutionConfigured()) {
@@ -270,7 +259,6 @@ export default function App() {
           setWhatsappOnline(false);
         }
       } else {
-        // Fallback to true for simulation mode if not configured
         setWhatsappOnline(true);
       }
     };
@@ -280,12 +268,9 @@ export default function App() {
   // Notification Toast alert
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
-  // Toast Auto-dismiss
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 5000);
+      const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
@@ -294,17 +279,39 @@ export default function App() {
     setToast({ msg, type });
   };
 
-  // State calculations helper: Recalculate student pending totals when boletos values shift!
+  // Audit log helper (ajuste F2)
+  const logParcelaHistorico = (parcelaId: string, alunoId: string, acao: string, observacao?: string, usuario?: string) => {
+    setParcelaHistorico(prev => [novoHistorico(parcelaId, alunoId, acao, observacao, usuario || userEmail || undefined), ...prev]);
+  };
+
+  // Effect 1: keep PENDENTE/ATRASADO in sync with due dates (never touches final statuses)
+  useEffect(() => {
+    setParcelas(prev => {
+      let changed = false;
+      const next = prev.map(p => {
+        const eff = getStatusEfetivo(p);
+        if (eff !== p.status) {
+          changed = true;
+          return { ...p, status: eff, atualizadoEm: nowIso() };
+        }
+        return p;
+      });
+      return changed ? next : prev;
+    });
+  }, [parcelas]);
+
+  // Effect 2: recalculate each student's pending total & financial status from parcelas
   useEffect(() => {
     setAlunos(prevAlunos => {
       let hasChanges = false;
       const nextAlunos = prevAlunos.map(student => {
-        const unpaidBills = boletos.filter(b => b.alunoId === student.id && b.status !== 'PAGO');
-        const pendingSum = unpaidBills.reduce((acc, curr) => acc + curr.valor, 0);
-        
+        const studentParcelas = parcelas.filter(p => p.alunoId === student.id);
+        const emAberto = studentParcelas.filter(p => p.status === 'PENDENTE' || p.status === 'ATRASADO' || p.status === 'NEGOCIADO');
+        const pendingSum = emAberto.reduce((acc, curr) => acc + curr.valorAtual, 0);
+
         let financialStatus: Aluno['statusFinanceiro'] = 'EM_DIA';
-        if (unpaidBills.length > 0) {
-          const hasOverdue = unpaidBills.some(b => b.status === 'VENCIDO');
+        if (emAberto.length > 0) {
+          const hasOverdue = emAberto.some(p => p.status === 'ATRASADO');
           financialStatus = hasOverdue ? 'INADIMPLENTE' : 'PENDENTE';
         }
 
@@ -313,16 +320,12 @@ export default function App() {
         }
 
         hasChanges = true;
-        return {
-          ...student,
-          valorPendente: pendingSum,
-          statusFinanceiro: financialStatus
-        };
+        return { ...student, valorPendente: pendingSum, statusFinanceiro: financialStatus };
       });
 
       return hasChanges ? nextAlunos : prevAlunos;
     });
-  }, [boletos]);
+  }, [parcelas]);
 
   // Auth triggers
   const handleLogin = (email: string) => {
@@ -339,74 +342,101 @@ export default function App() {
     postToastAlert('Sessão encerrada com segurança.', 'warning');
   };
 
-  // Operation 1: Simulate single boleto PAYMENT
-  const handleSimulatePayment = (boletoId: string) => {
-    const targetBoleto = boletos.find(b => b.id === boletoId);
-    if (!targetBoleto) return;
+  // Generic parcela mutation helper
+  const updateParcela = (parcelaId: string, patch: Partial<Parcela>) => {
+    setParcelas(prev => prev.map(p => p.id === parcelaId ? { ...p, ...patch, atualizadoEm: nowIso() } : p));
+  };
 
-    setBoletos(prev => prev.map(b => b.id === boletoId ? { ...b, status: 'PAGO' } : b));
+  // Operation: register a payment for a single parcela
+  const handleMarkParcelaPaid = (parcelaId: string) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+    const wasNegotiated = target.status === 'NEGOCIADO';
 
-    // Append activity log
-    const nowTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    updateParcela(parcelaId, { status: 'PAGO', dataPagamento: new Date().toLocaleDateString('pt-BR') });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Pagamento registrado',
+      `Parcela ${formatParcela(target)} quitada (R$ ${target.valorAtual.toFixed(2)})${wasNegotiated ? ' — recuperada via negociação' : ''}`);
+
     const newLog: LogAtividade = {
       id: `log-${Date.now()}`,
-      timestamp: nowTimestamp,
+      timestamp: logTimestamp(),
       tipo: 'CRM',
       usuario: 'Retorno Bancário API',
-      detalhe: `Mensalidade consolidada de Mariana/Alunos (Ref: ${targetBoleto.competencia}) no valor de R$ ${targetBoleto.valor}.`,
+      detalhe: `Pagamento da parcela ${formatParcela(target)} de ${target.alunoNome} (Ref: ${target.competencia}) no valor de R$ ${target.valorAtual.toFixed(2)}.`,
       sucesso: true
     };
     setLogs(prev => [newLog, ...prev]);
 
-    // Append CRM synchronization feedback automatically!
     const updatedCrmLogs = [
-      `${nowTimestamp} - CRM Sincronizado: Tag "${crmConfig.tagMap.pago}" associada ao aluno ${targetBoleto.alunoNome} devido à quitação da Ref: ${targetBoleto.competencia}.`,
+      `${logTimestamp()} - CRM Sincronizado: Tag "${crmConfig.tagMap.pago}" associada a ${target.alunoNome} pela quitação da parcela ${formatParcela(target)}.`,
       ...crmConfig.logSincronizacao
     ];
-    setCrmConfig(prev => ({
-      ...prev,
-      logSincronizacao: updatedCrmLogs
-    }));
+    setCrmConfig(prev => ({ ...prev, logSincronizacao: updatedCrmLogs }));
 
-    postToastAlert(`Boleto ${targetBoleto.nossoNumero} quitado. O cadastro de ${targetBoleto.alunoNome} foi reclassificado automático.`, 'success');
+    postToastAlert(`Parcela ${formatParcela(target)} de ${target.alunoNome} marcada como paga.`, 'success');
   };
 
-  // Operation 2: Add bulk OCR read boletos
-  const handleImportBoletoSuccess = (novoBoleto: Boleto) => {
-    setBoletos(prev => [novoBoleto, ...prev]);
-
-    const nowTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const newLog: LogAtividade = {
-      id: `log-${Date.now()}`,
-      timestamp: nowTimestamp,
-      tipo: 'IMPORTACAO',
-      usuario: 'adm.financeiro',
-      detalhe: `Boleto importado via OCR para ${novoBoleto.alunoNome} (Ref: ${novoBoleto.competencia}) no valor de R$ ${novoBoleto.valor}.`,
-      sucesso: true
-    };
-    setLogs(prev => [newLog, ...prev]);
+  // Operation: register a negotiation on a single parcela (sem gerar novas parcelas)
+  const handleRegisterNegotiation = (parcelaId: string, observacao?: string) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+    updateParcela(parcelaId, { status: 'NEGOCIADO', observacoes: observacao || target.observacoes });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Status alterado para NEGOCIADO', observacao || 'Negociação registrada');
+    postToastAlert(`Parcela ${formatParcela(target)} marcada como NEGOCIADO.`, 'success');
   };
 
-  // Operation 3: Fast trigger individual WhatsApp Billing Warning
-  const handleTriggerSingleBoletoWhatsApp = async (boleto: Boleto) => {
+  // Operation: edit due date
+  const handleEditDueDate = (parcelaId: string, novoVencimento: string) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+    updateParcela(parcelaId, { vencimento: novoVencimento, status: getStatusEfetivo({ status: 'PENDENTE', vencimento: novoVencimento }) });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Vencimento alterado', `De ${target.vencimento} para ${novoVencimento}`);
+    postToastAlert(`Vencimento da parcela ${formatParcela(target)} atualizado para ${novoVencimento}.`, 'success');
+  };
+
+  // Operation: edit current value (keeps valorOriginal)
+  const handleEditValor = (parcelaId: string, novoValor: number) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+    updateParcela(parcelaId, { valorAtual: novoValor });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Parcela alterada', `Valor atual ajustado de R$ ${target.valorAtual.toFixed(2)} para R$ ${novoValor.toFixed(2)} (original R$ ${target.valorOriginal.toFixed(2)})`);
+    postToastAlert(`Valor da parcela ${formatParcela(target)} atualizado.`, 'success');
+  };
+
+  // Operation: cancel parcela
+  const handleCancelParcela = (parcelaId: string) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+    updateParcela(parcelaId, { status: 'CANCELADO' });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Parcela cancelada');
+    postToastAlert(`Parcela ${formatParcela(target)} cancelada.`, 'warning');
+  };
+
+  // Operation: exempt parcela
+  const handleExemptParcela = (parcelaId: string) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+    updateParcela(parcelaId, { status: 'ISENTO' });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Parcela isentada');
+    postToastAlert(`Parcela ${formatParcela(target)} isentada.`, 'success');
+  };
+
+  // Operation: send WhatsApp charge for a single parcela (só PENDENTE/ATRASADO)
+  const handleTriggerSingleParcelaWhatsApp = async (parcela: Parcela) => {
     if (!whatsappOnline) {
       postToastAlert('Impossível enviar. Evolution API está desconectada. Leia o QR Code.', 'error');
       return;
     }
+    if (!podeReceberCobranca(parcela)) {
+      postToastAlert(`A parcela ${formatParcela(parcela)} não está em aberto (status ${parcela.status}). Cobrança não enviada.`, 'warning');
+      return;
+    }
 
-    const linkedStudent = alunos.find(a => a.id === boleto.alunoId);
+    const linkedStudent = alunos.find(a => a.id === parcela.alunoId);
     if (!linkedStudent) return;
 
-    // Get active message Template (or default warning if none matches)
     const activeRule = regras.find(r => r.ativo) || regras[0];
-    const customizedText = activeRule.mensagemTemplate
-      .replace('{nome_aluno}', linkedStudent.nome)
-      .replace('{curso}', linkedStudent.curso)
-      .replace('{valor_boleto}', `R$ ${boleto.valor.toFixed(2)}`)
-      .replace('{vencimento_boleto}', boleto.vencimento)
-      .replace('{competencia}', boleto.competencia)
-      .replace('{link_pdf}', `https://sentidos.edu.br/b/${boleto.id}`)
-      .replace('{linha_digitavel}', boleto.linhaDigitavel);
+    const customizedText = buildCobrancaText(activeRule.mensagemTemplate, linkedStudent, parcela);
 
     let apiSuccess = true;
     let apiErrorMsg = '';
@@ -421,84 +451,80 @@ export default function App() {
       }
     }
 
-    const nowTime = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-    
-    if (apiSuccess) {
-      // Increment sending counts in boleto listing
-      setBoletos(prev => prev.map(b => b.id === boleto.id ? {
-        ...b,
-        enviadoWhatsAppCount: b.enviadoWhatsAppCount + 1,
-        ultimoEnvio: nowTime
-      } : b));
+    const nowTime = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-      // Insert conversational message history log
-      const nowIso = new Date().toISOString();
+    if (apiSuccess) {
+      updateParcela(parcela.id, { enviadoWhatsAppCount: parcela.enviadoWhatsAppCount + 1, ultimoEnvio: nowTime });
+      logParcelaHistorico(parcela.id, linkedStudent.id, 'Cobrança enviada', `Disparo via régua para ${linkedStudent.nome}`);
+
       const newMsg: WhatsAppMensagem = {
         id: `msg-${Date.now()}`,
         alunoId: linkedStudent.id,
         tipo: 'SISTEMA',
         texto: customizedText,
-        dataHora: nowIso,
+        dataHora: nowIso(),
         statusEnvio: 'ENTREGUE'
       };
       setMensagens(prev => [...prev, newMsg]);
 
-      // Insert activity log
-      const logTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       const newLog: LogAtividade = {
         id: `log-${Date.now()}`,
-        timestamp: logTime,
+        timestamp: logTimestamp(),
         tipo: 'WHATSAPP',
         usuario: 'Sistema de Automação',
-        detalhe: `Disparo automático via régua de cobrança para ${linkedStudent.nome} (+55 ${linkedStudent.whatsapp})`,
+        detalhe: `Cobrança da parcela ${formatParcela(parcela)} enviada para ${linkedStudent.nome} (${linkedStudent.whatsapp})`,
         sucesso: true
       };
       setLogs(prev => [newLog, ...prev]);
 
-      postToastAlert(`Alerta WhatsApp direcionado com sucesso para ${linkedStudent.nome}.`, 'success');
+      postToastAlert(`Cobrança WhatsApp enviada para ${linkedStudent.nome}.`, 'success');
     } else {
-      // Log failure
-      const logTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       const newLog: LogAtividade = {
         id: `log-${Date.now()}`,
-        timestamp: logTime,
+        timestamp: logTimestamp(),
         tipo: 'WHATSAPP',
         usuario: 'Sistema de Automação',
-        detalhe: `Falha no disparo via régua para ${linkedStudent.nome} (+55 ${linkedStudent.whatsapp}). Erro: ${apiErrorMsg}`,
+        detalhe: `Falha no disparo da parcela ${formatParcela(parcela)} para ${linkedStudent.nome}. Erro: ${apiErrorMsg}`,
         sucesso: false
       };
       setLogs(prev => [newLog, ...prev]);
-      
       postToastAlert(`Falha ao disparar WhatsApp para ${linkedStudent.nome}: ${apiErrorMsg}`, 'error');
     }
   };
 
-  // Operation 4: Trigger warnings for ALL OVERDUE boletos at once
+  // Operation: charge all overdue parcelas at once
   const handleTriggerAllOverdueWhatsApp = () => {
     if (!whatsappOnline) {
       postToastAlert('Disparo massivo recusado. Evolution API desconectada.', 'error');
       return;
     }
 
-    const overdueBoletos = boletos.filter(b => {
-      if (b.status !== 'VENCIDO') return false;
-      const student = alunos.find(a => a.id === b.alunoId);
+    const overdue = parcelas.filter(p => {
+      if (p.status !== 'ATRASADO') return false;
+      const student = alunos.find(a => a.id === p.alunoId);
       return student?.cobrancaAutomatica !== false;
     });
 
-    if (overdueBoletos.length === 0) {
-      postToastAlert('Nenhum boleto em atraso (VENCIDO) com régua de cobrança automática ativa.', 'warning');
+    if (overdue.length === 0) {
+      postToastAlert('Nenhuma parcela em atraso (ATRASADO) com régua automática ativa.', 'warning');
       return;
     }
 
-    overdueBoletos.forEach(bol => {
-      handleTriggerSingleBoletoWhatsApp(bol);
-    });
-
-    postToastAlert(`Lote de cobrança disparado! Notificado ${overdueBoletos.length} alunos com pendência.`, 'success');
+    overdue.forEach(p => handleTriggerSingleParcelaWhatsApp(p));
+    postToastAlert(`Lote de cobrança disparado! Notificadas ${overdue.length} parcelas em atraso.`, 'success');
   };
 
-  // Operation 4.5: Toggle automatic billing status for a student
+  // Operation: route a parcela to human attendance
+  const handleSendParcelaToHuman = (parcela: Parcela) => {
+    const student = alunos.find(a => a.id === parcela.alunoId);
+    if (!student) return;
+    logParcelaHistorico(parcela.id, student.id, 'Enviada para atendimento humano', `Parcela ${formatParcela(parcela)}`);
+    setSelectedStudentId(student.id);
+    setCurrentTab('whatsapp');
+    postToastAlert(`Atendimento humano acionado para ${student.nome}.`, 'success');
+  };
+
+  // Toggle automatic billing
   const handleToggleCobrancaAutomatica = (alunoId: string) => {
     setAlunos(prev => prev.map(a => {
       if (a.id === alunoId) {
@@ -510,7 +536,7 @@ export default function App() {
     }));
   };
 
-  // Operation 5: Send chat direct ad-hoc message or human reply
+  // Send ad-hoc / human chat message
   const handleSendMessage = async (alunoId: string, texto: string, tipo: 'SISTEMA' | 'HUMANO_AGENTE' | 'HUMANO_CLIENTE') => {
     const targetStudent = alunos.find(a => a.id === alunoId);
     let apiSuccess = true;
@@ -528,11 +554,9 @@ export default function App() {
 
     if (!apiSuccess) {
       postToastAlert(`Erro ao enviar WhatsApp: ${apiErrorMsg}`, 'error');
-      // Insert failed activity log
-      const logTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       const newLog: LogAtividade = {
         id: `log-${Date.now()}`,
-        timestamp: logTime,
+        timestamp: logTimestamp(),
         tipo: 'WHATSAPP',
         usuario: tipo === 'SISTEMA' ? 'Sistema de Automação' : 'Atendente Humano',
         detalhe: `Falha no envio de mensagem para Aluno ID: ${alunoId}. Erro: ${apiErrorMsg}`,
@@ -542,28 +566,21 @@ export default function App() {
       return;
     }
 
-    const nowIso = new Date().toISOString();
     const newMsg: WhatsAppMensagem = {
       id: `msg-${Date.now()}`,
       alunoId,
       tipo,
       texto,
-      dataHora: nowIso,
+      dataHora: nowIso(),
       statusEnvio: 'ENTREGUE'
     };
     setMensagens(prev => [...prev, newMsg]);
 
-    // Insert activity log
-    const logTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const newLog: LogAtividade = {
       id: `log-${Date.now()}`,
-      timestamp: logTime,
+      timestamp: logTimestamp(),
       tipo: 'WHATSAPP',
-      usuario: tipo === 'SISTEMA' 
-        ? 'Sistema de Automação' 
-        : tipo === 'HUMANO_AGENTE' 
-          ? 'Atendente Humano' 
-          : 'Estudante FAEPI',
+      usuario: tipo === 'SISTEMA' ? 'Sistema de Automação' : tipo === 'HUMANO_AGENTE' ? 'Atendente Humano' : 'Estudante FAEPI',
       detalhe: tipo === 'SISTEMA'
         ? `Robô de cobrança enviou mensagem automática.`
         : tipo === 'HUMANO_AGENTE'
@@ -574,90 +591,100 @@ export default function App() {
     setLogs(prev => [newLog, ...prev]);
   };
 
-  // Operation 6: Deal simulation (Negociações FAEPI)
-  const handleSimulateDeal = (alunoId: string, parcelas: number, valorTotal: number) => {
+  // Negotiation: original parcelas → NEGOCIADO; new agreement parcelas only on confirmation (ajuste F6)
+  const handleSimulateDeal = (alunoId: string, qtdParcelas: number, valorTotal: number) => {
     const alunoObj = alunos.find(a => a.id === alunoId);
     if (!alunoObj) return;
 
-    // Simulate closing all currently overdue or open bills for this student, type as NEGOCIADO
-    setBoletos(prev => prev.map(b => b.alunoId === alunoId ? { ...b, status: 'PAGO' } : b));
+    // 1. Open parcelas of this student become NEGOCIADO
+    const abertas = parcelas.filter(p => p.alunoId === alunoId && (p.status === 'PENDENTE' || p.status === 'ATRASADO'));
+    setParcelas(prev => prev.map(p =>
+      p.alunoId === alunoId && (p.status === 'PENDENTE' || p.status === 'ATRASADO')
+        ? { ...p, status: 'NEGOCIADO', atualizadoEm: nowIso() }
+        : p
+    ));
+    abertas.forEach(p => logParcelaHistorico(p.id, alunoId, 'Status alterado para NEGOCIADO', 'Incluída no acordo de parcelamento'));
 
-    // Append dynamic new negotiated parcelled bills
+    // 2. Confirmed agreement → create new NEGOCIACAO parcelas
+    const valorParcela = valorTotal / qtdParcelas;
     const refDate = new Date();
-    const novasParcelas: Boleto[] = Array.from({ length: parcelas }).map((_, pIdx) => {
+    const novasParcelas: Parcela[] = Array.from({ length: qtdParcelas }).map((_, idx) => {
       const nextMonth = new Date(refDate);
-      nextMonth.setMonth(refDate.getMonth() + pIdx + 1);
-      const compString = `${String(nextMonth.getMonth()+1).padStart(2, '0')}/${nextMonth.getFullYear()}`;
-      
-      const pId = `acordo-${Date.now()}-${pIdx+1}`;
-      return {
-        id: pId,
-        alunoId: alunoId,
+      nextMonth.setMonth(refDate.getMonth() + idx + 1);
+      nextMonth.setDate(alunoObj.diaVencimento || 10);
+      const comp = `${String(nextMonth.getMonth() + 1).padStart(2, '0')}/${nextMonth.getFullYear()}`;
+      const venc = `${String(nextMonth.getDate()).padStart(2, '0')}/${comp}`;
+      const id = `acordo-${Date.now()}-${idx + 1}`;
+      const created: Parcela = {
+        id,
+        alunoId,
         alunoNome: alunoObj.nome,
-        competencia: compString,
-        vencimento: `10/${compString}`,
-        valor: valorTotal / parcelas,
-        status: 'ABERTO',
-        linhaDigitavel: '00190.00009 02738.162006 12345.678901 8 ' + Math.floor(100000000+Math.random()*900000000),
-        nossoNumero: `AA/2026-90${pIdx+1}`,
-        pdfUrl: '#',
-        enviadoWhatsAppCount: 0
+        curso: alunoObj.curso,
+        turma: alunoObj.turma || '',
+        polo: alunoObj.polo,
+        numeroParcela: idx + 1,
+        totalParcelas: qtdParcelas,
+        competencia: comp,
+        vencimento: venc,
+        valorOriginal: valorParcela,
+        valorAtual: valorParcela,
+        status: 'PENDENTE',
+        origem: 'NEGOCIACAO',
+        observacoes: 'Acordo de renegociação',
+        enviadoWhatsAppCount: 0,
+        criadoEm: nowIso(),
+        atualizadoEm: nowIso()
       };
+      created.status = getStatusEfetivo(created);
+      return created;
     });
+    setParcelas(prev => [...novasParcelas, ...prev]);
+    novasParcelas.forEach(p => logParcelaHistorico(p.id, alunoId, 'Acordo criado', `Parcela ${formatParcela(p)} do acordo (R$ ${valorParcela.toFixed(2)})`));
 
-    setBoletos(prev => [...novasParcelas, ...prev]);
-
-    const logTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    // Log Activity
     const newLog: LogAtividade = {
       id: `log-${Date.now()}`,
-      timestamp: logTime,
+      timestamp: logTimestamp(),
       tipo: 'CRM',
       usuario: 'Atendente Humano',
-      detalhe: `Acordo financeiro fechado para ${alunoObj.nome} em ${parcelas} parcelas de R$ ${(valorTotal/parcelas).toFixed(2)}.`,
+      detalhe: `Acordo financeiro fechado para ${alunoObj.nome} em ${qtdParcelas} parcelas de R$ ${valorParcela.toFixed(2)}.`,
       sucesso: true
     };
     setLogs(prev => [newLog, ...prev]);
 
-    // Push LeadConnector Log
     const updatedCrmLogs = [
-      `${logTime} - CRM LeadConnector: Lead movido para fase "Acordo Realizado / Aguardando Boleto" para ${alunoObj.nome}.`,
+      `${logTimestamp()} - CRM LeadConnector: Lead movido para "Acordo Realizado" para ${alunoObj.nome}.`,
       ...crmConfig.logSincronizacao
     ];
-    setCrmConfig(prev => ({
-      ...prev,
-      logSincronizacao: updatedCrmLogs
-    }));
+    setCrmConfig(prev => ({ ...prev, logSincronizacao: updatedCrmLogs }));
   };
 
-  // Jump helper: select student and slide to details
+  // Jump helper
   const handleSelectStudentJump = (studentId: string) => {
     setSelectedStudentId(studentId);
     setCurrentTab('alunos');
   };
 
-  // Single WhatsApp fast override from student general warning list click
+  // Fast WhatsApp from student list
   const handleFastWhatsAppNotification = (student: Aluno) => {
-    // Find first unpaid bill for this student
-    const outstandingBill = boletos.find(b => b.alunoId === student.id && b.status !== 'PAGO');
-    if (outstandingBill) {
-      handleTriggerSingleBoletoWhatsApp(outstandingBill);
+    const outstanding = parcelas.find(p => p.alunoId === student.id && (p.status === 'PENDENTE' || p.status === 'ATRASADO'));
+    if (outstanding) {
+      handleTriggerSingleParcelaWhatsApp(outstanding);
     } else {
-      postToastAlert(`O dependente ${student.nome} não apresenta mensalidades a faturar no momento.`, 'warning');
+      postToastAlert(`${student.nome} não apresenta parcelas em aberto no momento.`, 'warning');
     }
   };
 
-  // Add new students (manual/bulk CSV)
-  const handleAddAlunos = (novos: Omit<Aluno, 'id' | 'matricula' | 'valorPendente' | 'statusFinanceiro' | 'cadastroData'>[]): Aluno[] => {
+  // Add new students (manual/bulk CSV) + generate parcelas from matrícula financeira
+  const handleAddAlunos = (
+    novos: Omit<Aluno, 'id' | 'matricula' | 'valorPendente' | 'statusFinanceiro' | 'cadastroData'>[]
+  ): Aluno[] => {
     const today = new Date().toISOString().split('T')[0];
-    
-    // helper to find max suffix for year 2026
+
     const prefix = '2026-';
     const existingSuffixes = alunos
       .filter(a => a.matricula.startsWith(prefix))
       .map(a => {
-        const suffix = a.matricula.slice(prefix.length);
-        const parsed = parseInt(suffix, 10);
+        const parsed = parseInt(a.matricula.slice(prefix.length), 10);
         return isNaN(parsed) ? 0 : parsed;
       });
     const maxSuffix = existingSuffixes.length > 0 ? Math.max(...existingSuffixes) : 0;
@@ -679,15 +706,31 @@ export default function App() {
 
     setAlunos(prev => [...prev, ...mappedAlunos]);
 
-    // Logging
-    const nowTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const detail = mappedAlunos.length === 1 
-      ? `Estudante ${mappedAlunos[0].nome} cadastrado com sucesso (Matrícula: ${mappedAlunos[0].matricula}).`
-      : `Cadastro em lote realizado com sucesso. ${mappedAlunos.length} estudantes importados via CSV/Massa.`;
+    // Generate parcelas for students that carry a matrícula financeira (anti-duplicidade)
+    let acumulado = parcelas;
+    const todasNovasParcelas: Parcela[] = [];
+    mappedAlunos.forEach(aluno => {
+      const geradas = generateParcelas(aluno, acumulado, 'MATRICULA');
+      if (geradas.length > 0) {
+        todasNovasParcelas.push(...geradas);
+        acumulado = [...acumulado, ...geradas];
+      }
+    });
+    if (todasNovasParcelas.length > 0) {
+      setParcelas(prev => [...todasNovasParcelas, ...prev]);
+      setParcelaHistorico(prev => [
+        ...todasNovasParcelas.map(p => novoHistorico(p.id, p.alunoId, 'Parcela criada', `Parcela ${formatParcela(p)} gerada da matrícula financeira`, userEmail || undefined)),
+        ...prev
+      ]);
+    }
+
+    const detail = mappedAlunos.length === 1
+      ? `Estudante ${mappedAlunos[0].nome} cadastrado (Matrícula: ${mappedAlunos[0].matricula}). ${todasNovasParcelas.length} parcelas geradas.`
+      : `Cadastro em lote: ${mappedAlunos.length} estudantes importados, ${todasNovasParcelas.length} parcelas geradas.`;
 
     const newLog: LogAtividade = {
       id: `log-${Date.now()}`,
-      timestamp: nowTimestamp,
+      timestamp: logTimestamp(),
       tipo: mappedAlunos.length === 1 ? 'USUARIO' : 'IMPORTACAO',
       usuario: 'adm.financeiro',
       detalhe: detail,
@@ -696,128 +739,88 @@ export default function App() {
     setLogs(prev => [newLog, ...prev]);
 
     postToastAlert(
-      mappedAlunos.length === 1 
-        ? `Estudante ${mappedAlunos[0].nome} cadastrado com sucesso!`
-        : `Sucesso! ${mappedAlunos.length} estudantes importados com sucesso.`,
+      mappedAlunos.length === 1
+        ? `Estudante ${mappedAlunos[0].nome} cadastrado com ${todasNovasParcelas.length} parcelas!`
+        : `Sucesso! ${mappedAlunos.length} estudantes importados (${todasNovasParcelas.length} parcelas).`,
       'success'
     );
 
     return mappedAlunos;
   };
 
-  // Operation 7: Reset Database in server OR local storage
+  // Reset Database
   const handleResetDatabase = async () => {
     isResettingRef.current = true;
+    const clearLocal = () => {
+      ['sentidos_alunos', 'sentidos_parcelas', 'sentidos_parcelaHistorico', 'sentidos_mensagens',
+        'sentidos_regras', 'sentidos_crmConfig', 'sentidos_logs', 'sentidos_polos', 'sentidos_users']
+        .forEach(safeRemoveItem);
+    };
     try {
       const response = await fetch('/api/reset', { method: 'POST' });
       if (response.ok) {
-        // Remove localStorage items to ensure clean state
-        safeRemoveItem('sentidos_alunos');
-        safeRemoveItem('sentidos_boletos');
-        safeRemoveItem('sentidos_mensagens');
-        safeRemoveItem('sentidos_regras');
-        safeRemoveItem('sentidos_crmConfig');
-        safeRemoveItem('sentidos_logs');
-        safeRemoveItem('sentidos_polos');
-        safeRemoveItem('sentidos_users');
-        
+        clearLocal();
         postToastAlert('Banco de dados redefinido para o padrão! Recarregando...', 'success');
-
-        // Force full page reload to guarantee clean state
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
+        setTimeout(() => window.location.reload(), 800);
         return;
       } else {
         isResettingRef.current = false;
-        postToastAlert('O servidor de backend respondeu com erro ao redefinir o banco.', 'error');
+        const data = await response.json().catch(() => ({}));
+        postToastAlert(data.error || 'O servidor respondeu com erro ao redefinir o banco.', 'error');
       }
     } catch (err) {
-      // Offline fallback: reset localStorage
-      safeRemoveItem('sentidos_alunos');
-      safeRemoveItem('sentidos_boletos');
-      safeRemoveItem('sentidos_mensagens');
-      safeRemoveItem('sentidos_regras');
-      safeRemoveItem('sentidos_crmConfig');
-      safeRemoveItem('sentidos_logs');
-      safeRemoveItem('sentidos_polos');
-      safeRemoveItem('sentidos_users');
-
+      clearLocal();
       postToastAlert('Banco offline redefinido para o padrão! Recarregando...', 'success');
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 800);
-      return;
+      setTimeout(() => window.location.reload(), 800);
     }
   };
 
-  // Operation 7.5: Clear Database for Production (wipe students, bills, logs, messages)
+  // Clear Database for Production
   const handleClearDatabase = async () => {
     isResettingRef.current = true;
+    const clearLocal = () => {
+      ['sentidos_alunos', 'sentidos_parcelas', 'sentidos_parcelaHistorico', 'sentidos_mensagens', 'sentidos_logs']
+        .forEach(safeRemoveItem);
+    };
     try {
       const response = await fetch('/api/clear-db', { method: 'POST' });
       if (response.ok) {
-        // Clean localStorage items FIRST to prevent any restore from local cache
-        safeRemoveItem('sentidos_alunos');
-        safeRemoveItem('sentidos_boletos');
-        safeRemoveItem('sentidos_mensagens');
-        safeRemoveItem('sentidos_logs');
-
+        clearLocal();
         postToastAlert('Banco de dados limpo para produção! Recarregando...', 'success');
-
-        // Force full page reload after a brief delay to guarantee clean state.
-        // This eliminates any possibility of stale in-memory React state being
-        // re-synced back to the server.
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
-        return; // Don't continue, page will reload
+        setTimeout(() => window.location.reload(), 800);
+        return;
       } else {
         isResettingRef.current = false;
-        postToastAlert('O servidor respondeu com erro ao limpar o banco de dados.', 'error');
+        const data = await response.json().catch(() => ({}));
+        postToastAlert(data.error || 'O servidor respondeu com erro ao limpar o banco de dados.', 'error');
       }
     } catch (err) {
-      // Offline fallback: wipe local storage
-      safeRemoveItem('sentidos_alunos');
-      safeRemoveItem('sentidos_boletos');
-      safeRemoveItem('sentidos_mensagens');
-      safeRemoveItem('sentidos_logs');
-
+      clearLocal();
       postToastAlert('Banco offline (localStorage) limpo para produção! Recarregando...', 'success');
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 800);
-      return;
+      setTimeout(() => window.location.reload(), 800);
     }
   };
 
-  // Operation 8: Delete student and their dependencies safely
+  // Delete student and dependencies
   const handleDeleteAluno = (alunoId: string) => {
     const studentObj = alunos.find(a => a.id === alunoId);
     if (!studentObj) return;
 
-    // Remove student
     setAlunos(prev => prev.filter(a => a.id !== alunoId));
-    // Filter out boletos
-    setBoletos(prev => prev.filter(b => b.alunoId !== alunoId));
-    // Filter out WhatsApp messages
+    setParcelas(prev => prev.filter(p => p.alunoId !== alunoId));
+    setParcelaHistorico(prev => prev.filter(h => h.alunoId !== alunoId));
     setMensagens(prev => prev.filter(m => m.alunoId !== alunoId));
-    
-    // Append activity log
-    const nowTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
     const newLog: LogAtividade = {
       id: `log-${Date.now()}`,
-      timestamp: nowTimestamp,
+      timestamp: logTimestamp(),
       tipo: 'USUARIO',
       usuario: 'adm.financeiro',
-      detalhe: `Estudante ${studentObj.nome} (Matrícula: ${studentObj.matricula}) excluído com sucesso do sistema, junto com todas as suas cobranças e histórico de mensagens.`,
+      detalhe: `Estudante ${studentObj.nome} (Matrícula: ${studentObj.matricula}) excluído, junto com suas parcelas e histórico.`,
       sucesso: true
     };
     setLogs(prev => [newLog, ...prev]);
 
-    // Clear selected student ID if it matches
     if (selectedStudentId === alunoId) {
       setSelectedStudentId(null);
     }
@@ -831,11 +834,11 @@ export default function App() {
       case 'dashboard':
         return (
           <div className="animate-fade-in transition duration-300">
-            <DashboardView 
-              alunos={alunos} 
-              boletos={boletos} 
-              logs={logs} 
-              onSetTab={setCurrentTab} 
+            <DashboardView
+              alunos={alunos}
+              parcelas={parcelas}
+              logs={logs}
+              onSetTab={setCurrentTab}
             />
           </div>
         );
@@ -845,13 +848,14 @@ export default function App() {
           if (matchedStudent) {
             return (
               <div className="animate-fade-in transition duration-300">
-                <StudentDetailView 
+                <StudentDetailView
                   student={matchedStudent}
-                  boletos={boletos}
+                  parcelas={parcelas}
+                  parcelaHistorico={parcelaHistorico}
                   mensagens={mensagens}
                   onBack={() => setSelectedStudentId(null)}
                   onSendCustomWhatsApp={(alunoId, txt) => handleSendMessage(alunoId, txt, 'HUMANO_AGENTE')}
-                  onSimulatePayment={handleSimulatePayment}
+                  onMarkPaid={handleMarkParcelaPaid}
                   onSimulateDeal={handleSimulateDeal}
                   onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
                 />
@@ -861,10 +865,10 @@ export default function App() {
         }
         return (
           <div className="animate-fade-in transition duration-300">
-            <StudentsView 
-              alunos={alunos} 
+            <StudentsView
+              alunos={alunos}
               polos={polos}
-              onSelectStudent={handleSelectStudentJump} 
+              onSelectStudent={handleSelectStudentJump}
               onFastWhatsAppNotification={handleFastWhatsAppNotification}
               onAddAlunos={handleAddAlunos}
               onDeleteAluno={handleDeleteAluno}
@@ -872,34 +876,28 @@ export default function App() {
             />
           </div>
         );
-      case 'boletos':
+      case 'parcelas':
         return (
           <div className="animate-fade-in transition duration-300">
-            <BoletosView 
-              boletos={boletos}
+            <ParcelasView
+              parcelas={parcelas}
               alunos={alunos}
-              onSimulatePayment={handleSimulatePayment}
-              onTriggerSingleBoletoWhatsApp={handleTriggerSingleBoletoWhatsApp}
-              onTriggerAllOverdueWhatsApp={handleTriggerAllOverdueWhatsApp}
-            />
-          </div>
-        );
-      case 'importações':
-        return (
-          <div className="animate-fade-in transition duration-300">
-            <BoletosImportView 
-              alunos={alunos} 
-              polos={polos}
-              onAddAlunos={handleAddAlunos}
-              onImportSuccess={handleImportBoletoSuccess}
-              onPostAlert={postToastAlert}
+              onMarkPaid={handleMarkParcelaPaid}
+              onRegisterNegotiation={handleRegisterNegotiation}
+              onEditDueDate={handleEditDueDate}
+              onEditValor={handleEditValor}
+              onCancel={handleCancelParcela}
+              onExempt={handleExemptParcela}
+              onResendCharge={handleTriggerSingleParcelaWhatsApp}
+              onTriggerAllOverdue={handleTriggerAllOverdueWhatsApp}
+              onSendToHuman={handleSendParcelaToHuman}
             />
           </div>
         );
       case 'cobranças':
         return (
           <div className="animate-fade-in transition duration-300">
-            <CobrancasRulesView 
+            <CobrancasRulesView
               regras={regras}
               onSaveRegras={setRegras}
               onPostAlert={postToastAlert}
@@ -923,7 +921,7 @@ export default function App() {
       case 'crm':
         return (
           <div className="animate-fade-in transition duration-300">
-            <CRMView 
+            <CRMView
               crmConfig={crmConfig}
               alunos={alunos}
               onUpdateCrmConfig={setCrmConfig}
@@ -934,8 +932,8 @@ export default function App() {
       case 'configurações':
         return (
           <div className="animate-fade-in transition duration-300">
-            <ConfiguracoesView 
-              onPostAlert={postToastAlert} 
+            <ConfiguracoesView
+              onPostAlert={postToastAlert}
               onResetDatabase={handleResetDatabase}
               onClearDatabase={handleClearDatabase}
               polos={polos}
@@ -955,42 +953,38 @@ export default function App() {
     }
   };
 
-  // If user is not logged in, render strict login console view
   if (!userEmail) {
     return (
-      <LoginScreen 
-        appName="Sentidos Cobranças" 
-        onLoginSuccess={handleLogin} 
+      <LoginScreen
+        appName="Sentidos Cobranças"
+        onLoginSuccess={handleLogin}
       />
     );
   }
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
-      {/* Sidebar Navigation Panel */}
-      <Sidebar 
-        currentTab={currentTab} 
+      <Sidebar
+        currentTab={currentTab}
         onTabChange={(tab) => {
-          setSelectedStudentId(null); // Clear selections on tab navigation jumps
+          setSelectedStudentId(null);
           setCurrentTab(tab);
-          setIsMobileMenuOpen(false); // Fechar menu ao navegar no mobile
-        }} 
+          setIsMobileMenuOpen(false);
+        }}
         onLogout={handleLogout}
         userEmail={userEmail}
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Main Right panel containing Topbar & Active Tab router displays */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        {/* Superior Navigation Bar */}
-        <Topbar 
-          currentTab={currentTab} 
+        <Topbar
+          currentTab={currentTab}
           crmSynced={crmConfig.sincronizacaoAtiva}
           whatsappOnline={whatsappOnline}
           selectedStudentName={
-            selectedStudentId && currentTab === 'alunos' 
-              ? alunos.find(a => a.id === selectedStudentId)?.nome 
+            selectedStudentId && currentTab === 'alunos'
+              ? alunos.find(a => a.id === selectedStudentId)?.nome
               : null
           }
           onSelectStudentBack={() => setSelectedStudentId(null)}
@@ -998,13 +992,11 @@ export default function App() {
           onToggleMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
-        {/* Core display panels container */}
         <main className="pt-24 px-4 sm:px-8 pb-12 flex-1 w-full max-w-full overflow-x-hidden overflow-y-auto">
           {renderCurrentView()}
         </main>
       </div>
 
-      {/* Synergetic Notification float Toasts */}
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white rounded-xl shadow-2xl p-4 border border-white/10 flex items-start gap-3 max-w-sm transition-all duration-300 transform translate-y-0 scale-100 animate-slide-up">
           <div className="shrink-0 mt-0.5">
@@ -1015,7 +1007,7 @@ export default function App() {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold leading-relaxed font-sans">{toast.msg}</p>
           </div>
-          <button 
+          <button
             onClick={() => setToast(null)}
             className="p-0.5 text-gray-400 hover:text-white rounded cursor-pointer transition shrink-0"
           >
@@ -1026,4 +1018,3 @@ export default function App() {
     </div>
   );
 }
-

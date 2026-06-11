@@ -3,12 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { 
-  INITIAL_ALUNOS, 
-  INITIAL_BOLETOS, 
-  INITIAL_WHATSAPP_MENSAGENS, 
-  INITIAL_COBRANCA_REGRAS, 
-  INITIAL_CRM_CONFIG, 
+import {
+  INITIAL_ALUNOS,
+  INITIAL_PARCELAS,
+  INITIAL_PARCELA_HISTORICO,
+  INITIAL_WHATSAPP_MENSAGENS,
+  INITIAL_COBRANCA_REGRAS,
+  INITIAL_CRM_CONFIG,
   INITIAL_LOGS_ATIVIDADE,
   INITIAL_POLOS,
   INITIAL_USERS
@@ -19,10 +20,12 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DB_PATH = path.join(__dirname, 'database.json');
+const BACKUP_PATH = path.join(__dirname, 'database.boletos.backup.json');
 
 export interface DbData {
   alunos: any[];
-  boletos: any[];
+  parcelas: any[];
+  parcelaHistorico: any[];
   mensagens: any[];
   regras: any[];
   crmConfig: any;
@@ -34,7 +37,8 @@ export interface DbData {
 export function getInitialData(): DbData {
   return {
     alunos: INITIAL_ALUNOS,
-    boletos: INITIAL_BOLETOS,
+    parcelas: INITIAL_PARCELAS,
+    parcelaHistorico: INITIAL_PARCELA_HISTORICO,
     mensagens: INITIAL_WHATSAPP_MENSAGENS,
     regras: INITIAL_COBRANCA_REGRAS,
     crmConfig: INITIAL_CRM_CONFIG,
@@ -42,6 +46,34 @@ export function getInitialData(): DbData {
     polos: INITIAL_POLOS,
     users: INITIAL_USERS
   };
+}
+
+/**
+ * Grava (e valida) um backup do database.json atual antes de qualquer operação
+ * destrutiva. Retorna true se o backup foi gravado e relido com sucesso, ou se
+ * não há database.json a proteger (nada a perder). Retorna false se a gravação
+ * falhar — nesse caso a operação chamadora deve abortar.
+ */
+export function backupDatabaseFile(): boolean {
+  try {
+    if (!fs.existsSync(DB_PATH)) {
+      // Nada a proteger ainda.
+      return true;
+    }
+    const content = fs.readFileSync(DB_PATH, 'utf-8');
+    fs.writeFileSync(BACKUP_PATH, content, 'utf-8');
+    // Valida: relê o backup e confere o tamanho.
+    const check = fs.readFileSync(BACKUP_PATH, 'utf-8');
+    if (check.length !== content.length) {
+      console.error('[Database] Backup gravado com tamanho divergente. Abortando operação.');
+      return false;
+    }
+    console.log(`[Database] Backup de segurança gravado em ${BACKUP_PATH}`);
+    return true;
+  } catch (error) {
+    console.error('[Database] Falha ao gravar backup de segurança:', error);
+    return false;
+  }
 }
 
 let pool: pg.Pool | null = null;
@@ -57,6 +89,61 @@ if (usePg) {
   console.log('[Database] PostgreSQL não configurado (DATABASE_URL ausente). Utilizando modo de arquivo JSON (database.json).');
 }
 
+// Converte boletos legados em parcelas, preservando o histórico financeiro.
+function convertBoletosToParcelas(boletos: any[], alunos: any[]): any[] {
+  if (!Array.isArray(boletos) || boletos.length === 0) return [];
+
+  const statusMap: Record<string, string> = {
+    ABERTO: 'PENDENTE',
+    VENCIDO: 'ATRASADO',
+    PAGO: 'PAGO',
+    NEGOCIADO: 'NEGOCIADO'
+  };
+
+  // Agrupa por aluno para numerar as parcelas.
+  const porAluno: Record<string, any[]> = {};
+  for (const b of boletos) {
+    (porAluno[b.alunoId] = porAluno[b.alunoId] || []).push(b);
+  }
+
+  const nowIso = new Date().toISOString();
+  const parcelas: any[] = [];
+
+  for (const alunoId of Object.keys(porAluno)) {
+    const grupo = porAluno[alunoId].slice().sort((x, y) =>
+      String(x.vencimento).split('/').reverse().join('').localeCompare(String(y.vencimento).split('/').reverse().join(''))
+    );
+    const aluno = alunos.find(a => a.id === alunoId);
+    const total = grupo.length;
+    grupo.forEach((b, idx) => {
+      const valor = Number(b.valor) || 0;
+      parcelas.push({
+        id: b.id,
+        alunoId: b.alunoId,
+        alunoNome: b.alunoNome,
+        curso: aluno?.curso || '',
+        turma: aluno?.turma || '',
+        polo: aluno?.polo || '',
+        numeroParcela: idx + 1,
+        totalParcelas: total,
+        competencia: b.competencia || '',
+        vencimento: b.vencimento || '',
+        valorOriginal: valor,
+        valorAtual: valor,
+        status: statusMap[b.status] || 'PENDENTE',
+        origem: 'IMPORTACAO_CSV',
+        dataPagamento: b.status === 'PAGO' ? b.vencimento : undefined,
+        enviadoWhatsAppCount: b.enviadoWhatsAppCount || 0,
+        ultimoEnvio: b.ultimoEnvio,
+        criadoEm: nowIso,
+        atualizadoEm: nowIso
+      });
+    });
+  }
+
+  return parcelas;
+}
+
 // JSON Fallback read helper
 function readDBJson(): DbData {
   try {
@@ -65,7 +152,7 @@ function readDBJson(): DbData {
     }
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const parsed = JSON.parse(data);
-    
+
     let updated = false;
     if (!parsed.polos) {
       parsed.polos = INITIAL_POLOS;
@@ -73,6 +160,10 @@ function readDBJson(): DbData {
     }
     if (!parsed.users) {
       parsed.users = INITIAL_USERS;
+      updated = true;
+    }
+    if (!parsed.parcelaHistorico) {
+      parsed.parcelaHistorico = [];
       updated = true;
     }
     if (parsed.alunos && Array.isArray(parsed.alunos)) {
@@ -84,6 +175,23 @@ function readDBJson(): DbData {
         return a;
       });
     }
+
+    // Migração segura boletos → parcelas (com backup obrigatório).
+    if (parsed.boletos && !parsed.parcelas) {
+      if (backupDatabaseFile()) {
+        parsed.parcelas = convertBoletosToParcelas(parsed.boletos, parsed.alunos || []);
+        console.log(`[Database] Migração boletos→parcelas concluída: ${parsed.parcelas.length} parcelas. Boletos preservados no backup.`);
+        updated = true;
+      } else {
+        console.error('[Database] Backup falhou — conversão de boletos abortada. Mantendo dados originais intactos.');
+        parsed.parcelas = [];
+      }
+    }
+    if (!parsed.parcelas) {
+      parsed.parcelas = [];
+      updated = true;
+    }
+
     if (updated) {
       writeDBJson(parsed);
     }
@@ -108,13 +216,16 @@ export async function initDb(): Promise<void> {
   if (!usePg || !pool) {
     if (!fs.existsSync(DB_PATH)) {
       writeDBJson(getInitialData());
+    } else {
+      // Garante migração/normalização na primeira leitura.
+      readDBJson();
     }
     return;
   }
 
   try {
     console.log('[Database] Criando tabelas no PostgreSQL caso não existam...');
-    
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS polos (
         nome VARCHAR(255) PRIMARY KEY
@@ -146,19 +257,46 @@ export async function initDb(): Promise<void> {
         "cobrancaAutomatica" BOOLEAN DEFAULT TRUE
       );
 
-      CREATE TABLE IF NOT EXISTS boletos (
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS turma VARCHAR(100);
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "valorMensalidade" NUMERIC(12, 2);
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "totalParcelas" INTEGER;
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "parcelasPagas" INTEGER;
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "primeiroVencimentoEmAberto" VARCHAR(50);
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "diaVencimento" INTEGER;
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "dataMatriculaFinanceira" VARCHAR(50);
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS observacoes TEXT;
+
+      CREATE TABLE IF NOT EXISTS parcelas (
         id VARCHAR(100) PRIMARY KEY,
         "alunoId" VARCHAR(100) NOT NULL,
         "alunoNome" VARCHAR(255) NOT NULL,
+        curso VARCHAR(255),
+        turma VARCHAR(100),
+        polo VARCHAR(100),
+        "numeroParcela" INTEGER NOT NULL,
+        "totalParcelas" INTEGER NOT NULL,
         competencia VARCHAR(50) NOT NULL,
         vencimento VARCHAR(50) NOT NULL,
-        valor NUMERIC(12, 2) NOT NULL,
+        "valorOriginal" NUMERIC(12, 2) NOT NULL,
+        "valorAtual" NUMERIC(12, 2) NOT NULL,
         status VARCHAR(50) NOT NULL,
-        "linhaDigitavel" VARCHAR(255) NOT NULL,
-        "nossoNumero" VARCHAR(100) NOT NULL,
-        "pdfUrl" VARCHAR(500) NOT NULL,
+        origem VARCHAR(50) NOT NULL,
+        "dataPagamento" VARCHAR(50),
+        observacoes TEXT,
         "enviadoWhatsAppCount" INTEGER DEFAULT 0,
-        "ultimoEnvio" VARCHAR(50)
+        "ultimoEnvio" VARCHAR(50),
+        "criadoEm" VARCHAR(50),
+        "atualizadoEm" VARCHAR(50)
+      );
+
+      CREATE TABLE IF NOT EXISTS parcela_historico (
+        id VARCHAR(100) PRIMARY KEY,
+        "parcelaId" VARCHAR(100) NOT NULL,
+        "alunoId" VARCHAR(100) NOT NULL,
+        data VARCHAR(50) NOT NULL,
+        acao VARCHAR(255) NOT NULL,
+        observacao TEXT,
+        usuario VARCHAR(255)
       );
 
       CREATE TABLE IF NOT EXISTS mensagens (
@@ -220,8 +358,6 @@ export async function initDb(): Promise<void> {
           } else {
             await writeDB(localData);
             console.log('[Database] Migração automática realizada com sucesso!');
-            
-            // Mark the local file as migrated instead of renaming to avoid Docker volume mount lock issues
             writeDBJson({ migrated: true } as any);
             console.log(`[Database] database.json marcado com {"migrated": true} para evitar migrações futuras.`);
           }
@@ -251,7 +387,8 @@ export async function readDB(): Promise<DbData> {
   try {
     const [
       alunosRes,
-      boletosRes,
+      parcelasRes,
+      historicoRes,
       mensagensRes,
       regrasRes,
       crmRes,
@@ -260,7 +397,8 @@ export async function readDB(): Promise<DbData> {
       usersRes
     ] = await Promise.all([
       pool.query('SELECT * FROM alunos ORDER BY nome ASC'),
-      pool.query('SELECT * FROM boletos ORDER BY vencimento DESC'),
+      pool.query('SELECT * FROM parcelas ORDER BY vencimento DESC'),
+      pool.query('SELECT * FROM parcela_historico ORDER BY data DESC'),
       pool.query('SELECT * FROM mensagens ORDER BY "dataHora" ASC'),
       pool.query('SELECT * FROM regras ORDER BY id ASC'),
       pool.query('SELECT * FROM crm_config WHERE id = 1'),
@@ -274,12 +412,15 @@ export async function readDB(): Promise<DbData> {
     return {
       alunos: alunosRes.rows.map(a => ({
         ...a,
-        valorPendente: parseFloat(a.valorPendente)
+        valorPendente: parseFloat(a.valorPendente),
+        valorMensalidade: a.valorMensalidade != null ? parseFloat(a.valorMensalidade) : undefined
       })),
-      boletos: boletosRes.rows.map(b => ({
-        ...b,
-        valor: parseFloat(b.valor)
+      parcelas: parcelasRes.rows.map(p => ({
+        ...p,
+        valorOriginal: parseFloat(p.valorOriginal),
+        valorAtual: parseFloat(p.valorAtual)
       })),
+      parcelaHistorico: historicoRes.rows,
       mensagens: mensagensRes.rows,
       regras: regrasRes.rows,
       crmConfig: {
@@ -311,7 +452,7 @@ export async function writeDB(data: DbData): Promise<void> {
   try {
     await client.query('BEGIN');
 
-    await client.query('TRUNCATE TABLE polos, users, alunos, boletos, mensagens, regras, crm_config, logs RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE TABLE polos, users, alunos, parcelas, parcela_historico, mensagens, regras, crm_config, logs RESTART IDENTITY CASCADE');
 
     if (Array.isArray(data.polos)) {
       for (const polo of data.polos) {
@@ -332,30 +473,46 @@ export async function writeDB(data: DbData): Promise<void> {
       for (const a of data.alunos) {
         await client.query(
           `INSERT INTO alunos (
-            id, nome, cpf, matricula, curso, polo, whatsapp, email, 
-            "statusFinanceiro", "valorPendente", "avatarUrl", "cadastroData", 
-            modalidade, "cobrancaAutomatica"
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            id, nome, cpf, matricula, curso, polo, whatsapp, email,
+            "statusFinanceiro", "valorPendente", "avatarUrl", "cadastroData",
+            modalidade, "cobrancaAutomatica", turma, "valorMensalidade",
+            "totalParcelas", "parcelasPagas", "primeiroVencimentoEmAberto",
+            "diaVencimento", "dataMatriculaFinanceira", observacoes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
           [
             a.id, a.nome, a.cpf, a.matricula, a.curso, a.polo, a.whatsapp, a.email,
             a.statusFinanceiro, a.valorPendente, a.avatarUrl, a.cadastroData,
-            a.modalidade, a.cobrancaAutomatica ?? true
+            a.modalidade, a.cobrancaAutomatica ?? true, a.turma, a.valorMensalidade,
+            a.totalParcelas, a.parcelasPagas, a.primeiroVencimentoEmAberto,
+            a.diaVencimento, a.dataMatriculaFinanceira, a.observacoes
           ]
         );
       }
     }
 
-    if (Array.isArray(data.boletos)) {
-      for (const b of data.boletos) {
+    if (Array.isArray(data.parcelas)) {
+      for (const p of data.parcelas) {
         await client.query(
-          `INSERT INTO boletos (
-            id, "alunoId", "alunoNome", competencia, vencimento, valor, status, 
-            "linhaDigitavel", "nossoNumero", "pdfUrl", "enviadoWhatsAppCount", "ultimoEnvio"
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          `INSERT INTO parcelas (
+            id, "alunoId", "alunoNome", curso, turma, polo, "numeroParcela", "totalParcelas",
+            competencia, vencimento, "valorOriginal", "valorAtual", status, origem,
+            "dataPagamento", observacoes, "enviadoWhatsAppCount", "ultimoEnvio", "criadoEm", "atualizadoEm"
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
           [
-            b.id, b.alunoId, b.alunoNome, b.competencia, b.vencimento, b.valor, b.status,
-            b.linhaDigitavel, b.nossoNumero, b.pdfUrl, b.enviadoWhatsAppCount || 0, b.ultimoEnvio
+            p.id, p.alunoId, p.alunoNome, p.curso, p.turma, p.polo, p.numeroParcela, p.totalParcelas,
+            p.competencia, p.vencimento, p.valorOriginal, p.valorAtual, p.status, p.origem,
+            p.dataPagamento, p.observacoes, p.enviadoWhatsAppCount || 0, p.ultimoEnvio, p.criadoEm, p.atualizadoEm
           ]
+        );
+      }
+    }
+
+    if (Array.isArray(data.parcelaHistorico)) {
+      for (const h of data.parcelaHistorico) {
+        await client.query(
+          `INSERT INTO parcela_historico (id, "parcelaId", "alunoId", data, acao, observacao, usuario)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [h.id, h.parcelaId, h.alunoId, h.data, h.acao, h.observacao, h.usuario]
         );
       }
     }
@@ -363,7 +520,7 @@ export async function writeDB(data: DbData): Promise<void> {
     if (Array.isArray(data.mensagens)) {
       for (const m of data.mensagens) {
         await client.query(
-          `INSERT INTO mensagens (id, "alunoId", tipo, texto, "dataHora", "statusEnvio") 
+          `INSERT INTO mensagens (id, "alunoId", tipo, texto, "dataHora", "statusEnvio")
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [m.id, m.alunoId, m.tipo, m.texto, m.dataHora, m.statusEnvio]
         );
@@ -373,7 +530,7 @@ export async function writeDB(data: DbData): Promise<void> {
     if (Array.isArray(data.regras)) {
       for (const r of data.regras) {
         await client.query(
-          `INSERT INTO regras (id, titulo, descricao, "diasGatilho", "tipoGatilho", "mensagemTemplate", ativo, "horarioEnvio") 
+          `INSERT INTO regras (id, titulo, descricao, "diasGatilho", "tipoGatilho", "mensagemTemplate", ativo, "horarioEnvio")
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             r.id, r.titulo, r.descricao, r.diasGatilho, r.tipoGatilho, r.mensagemTemplate,
@@ -387,7 +544,7 @@ export async function writeDB(data: DbData): Promise<void> {
       const c = data.crmConfig;
       await client.query(
         `INSERT INTO crm_config (
-          id, "apiKey", "urlWebhook", "sincronizacaoAtiva", 
+          id, "apiKey", "urlWebhook", "sincronizacaoAtiva",
           "logSincronizacao", pipelines, "tagMap"
         ) VALUES (1, $1, $2, $3, $4, $5, $6)`,
         [
@@ -402,7 +559,7 @@ export async function writeDB(data: DbData): Promise<void> {
     if (Array.isArray(data.logs)) {
       for (const l of data.logs) {
         await client.query(
-          `INSERT INTO logs (id, timestamp, tipo, usuario, detalhe, sucesso) 
+          `INSERT INTO logs (id, timestamp, tipo, usuario, detalhe, sucesso)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [l.id, l.timestamp, l.tipo, l.usuario, l.detalhe, l.sucesso ?? true]
         );
