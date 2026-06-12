@@ -58,10 +58,6 @@ import {
 
 const isSameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-const setIfChanged = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, nextValue: T) => {
-  setter(prev => isSameJson(prev, nextValue) ? prev : nextValue);
-};
-
 const nowIso = () => new Date().toISOString();
 const logTimestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
@@ -79,8 +75,12 @@ export default function App() {
   const [userEmail, setUserEmail] = useState<string | null>(() => {
     return safeGetItem('sentidos_user_email');
   });
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    return safeGetItem('sentidos_current_tab') || 'dashboard';
+  });
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(() => {
+    return safeGetItem('sentidos_selected_student_id');
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // API Connection/Loaded State
@@ -126,11 +126,29 @@ export default function App() {
   useEffect(() => { safeSetItem('sentidos_crmConfig', JSON.stringify(crmConfig)); }, [crmConfig]);
   useEffect(() => { safeSetItem('sentidos_logs', JSON.stringify(logs)); }, [logs]);
   useEffect(() => { safeSetItem('sentidos_users', JSON.stringify(users)); }, [users]);
+  useEffect(() => { safeSetItem('sentidos_current_tab', currentTab); }, [currentTab]);
+  useEffect(() => {
+    if (selectedStudentId) {
+      safeSetItem('sentidos_selected_student_id', selectedStudentId);
+    } else {
+      safeRemoveItem('sentidos_selected_student_id');
+    }
+  }, [selectedStudentId]);
 
   // Ref to prevent sync loop when polling updates from backend
   const skipSyncRef = useRef(false);
   const pendingSyncRef = useRef(false);
   const isResettingRef = useRef(false);
+
+  const setIfChanged = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, nextValue: T) => {
+    setter(prev => {
+      if (isSameJson(prev, nextValue)) {
+        return prev;
+      }
+      skipSyncRef.current = true;
+      return nextValue;
+    });
+  };
 
   // Initial Fetch from backend DB with LocalStorage fallback
   useEffect(() => {
@@ -139,7 +157,6 @@ export default function App() {
         const response = await fetch('/api/db');
         if (response.ok) {
           const data = await response.json();
-          skipSyncRef.current = true;
           if (data.alunos) setIfChanged(setAlunos, data.alunos);
           if (data.parcelas) setIfChanged(setParcelas, data.parcelas);
           if (data.parcelaHistorico) setIfChanged(setParcelaHistorico, data.parcelaHistorico);
@@ -177,7 +194,6 @@ export default function App() {
           if (isResettingRef.current) return;
 
           const data = await response.json();
-          skipSyncRef.current = true;
           if (data.alunos) setIfChanged(setAlunos, data.alunos);
           if (data.parcelas) setIfChanged(setParcelas, data.parcelas);
           if (data.parcelaHistorico) setIfChanged(setParcelaHistorico, data.parcelaHistorico);

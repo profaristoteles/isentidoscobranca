@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   Users, 
@@ -70,7 +70,13 @@ export default function ConfiguracoesView({
 
   const [lgpdConsent, setLgpdConsent] = useState(true);
   const [lgpdAnonCpf, setLgpdAnonCpf] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS'>('USERS');
+  const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS'>(() => {
+    return (safeGetItem('sentidos_active_subtab') as any) || 'USERS';
+  });
+  
+  useEffect(() => {
+    safeSetItem('sentidos_active_subtab', activeSubTab);
+  }, [activeSubTab]);
   
   const [activeProvider, setActiveProvider] = useState(() => {
     return safeGetItem('sentidos_active_provider') || 'gemini';
