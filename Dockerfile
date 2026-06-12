@@ -24,6 +24,7 @@ RUN npm install -g tsx
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/mockData.ts ./src/mockData.ts
 COPY --from=builder /app/src/types.ts ./src/types.ts
+COPY --from=builder /app/src/utils ./src/utils
 COPY --from=builder /app/database.ts ./database.ts
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
