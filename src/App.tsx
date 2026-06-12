@@ -46,7 +46,8 @@ import {
   INITIAL_CRM_CONFIG,
   INITIAL_LOGS_ATIVIDADE,
   INITIAL_POLOS,
-  INITIAL_USERS
+  INITIAL_USERS,
+  INITIAL_CURSOS
 } from './mockData';
 import {
   generateParcelas,
@@ -91,6 +92,9 @@ export default function App() {
   const [polos, setPolos] = useState<string[]>(() => {
     return safeParseJson(safeGetItem('sentidos_polos'), INITIAL_POLOS);
   });
+  const [cursos, setCursos] = useState<string[]>(() => {
+    return safeParseJson(safeGetItem('sentidos_cursos'), INITIAL_CURSOS);
+  });
   const [alunos, setAlunos] = useState<Aluno[]>(() => {
     return safeParseJson(safeGetItem('sentidos_alunos'), INITIAL_ALUNOS);
   });
@@ -118,6 +122,7 @@ export default function App() {
 
   // LocalStorage sync effects
   useEffect(() => { safeSetItem('sentidos_polos', JSON.stringify(polos)); }, [polos]);
+  useEffect(() => { safeSetItem('sentidos_cursos', JSON.stringify(cursos)); }, [cursos]);
   useEffect(() => { safeSetItem('sentidos_alunos', JSON.stringify(alunos)); }, [alunos]);
   useEffect(() => { safeSetItem('sentidos_parcelas', JSON.stringify(parcelas)); }, [parcelas]);
   useEffect(() => { safeSetItem('sentidos_parcelaHistorico', JSON.stringify(parcelaHistorico)); }, [parcelaHistorico]);
@@ -165,6 +170,7 @@ export default function App() {
           if (data.crmConfig) setIfChanged(setCrmConfig, data.crmConfig);
           if (data.logs) setIfChanged(setLogs, data.logs);
           if (data.polos) setIfChanged(setPolos, data.polos);
+          if (data.cursos) setIfChanged(setCursos, data.cursos);
           if (data.users) setIfChanged(setUsers, data.users);
 
           setIsUsingApi(true);
@@ -202,6 +208,7 @@ export default function App() {
           if (data.crmConfig) setIfChanged(setCrmConfig, data.crmConfig);
           if (data.logs) setIfChanged(setLogs, data.logs);
           if (data.polos) setIfChanged(setPolos, data.polos);
+          if (data.cursos) setIfChanged(setCursos, data.cursos);
           if (data.users) setIfChanged(setUsers, data.users);
         }
       } catch (err) {
@@ -244,6 +251,7 @@ export default function App() {
             crmConfig,
             logs,
             polos,
+            cursos,
             users
           })
         });
@@ -259,7 +267,7 @@ export default function App() {
 
     const timeoutId = setTimeout(syncToBackend, 500);
     return () => clearTimeout(timeoutId);
-  }, [alunos, parcelas, parcelaHistorico, mensagens, regras, crmConfig, logs, polos, users, dbLoaded, isUsingApi]);
+  }, [alunos, parcelas, parcelaHistorico, mensagens, regras, crmConfig, logs, polos, cursos, users, dbLoaded, isUsingApi]);
 
   // Connection states
   const [whatsappOnline, setWhatsappOnline] = useState<boolean>(true);
@@ -844,6 +852,36 @@ export default function App() {
     postToastAlert(`Estudante ${studentObj.nome} excluído com sucesso!`, 'success');
   };
 
+  const handleUpdateAluno = (alunoId: string, updatedFields: Partial<Aluno>) => {
+    setAlunos(prev => prev.map(a => a.id === alunoId ? { ...a, ...updatedFields } : a));
+
+    // Propagate changes to student's parcelas (name, course, polo, turma)
+    setParcelas(prev => prev.map(p => {
+      if (p.alunoId === alunoId) {
+        return {
+          ...p,
+          alunoNome: updatedFields.nome !== undefined ? updatedFields.nome : p.alunoNome,
+          curso: updatedFields.curso !== undefined ? updatedFields.curso : p.curso,
+          polo: updatedFields.polo !== undefined ? updatedFields.polo : p.polo,
+          turma: updatedFields.turma !== undefined ? updatedFields.turma : p.turma
+        };
+      }
+      return p;
+    }));
+
+    const targetStudent = alunos.find(a => a.id === alunoId);
+    const newLog: LogAtividade = {
+      id: `log-${Date.now()}`,
+      timestamp: logTimestamp(),
+      tipo: 'USUARIO',
+      usuario: 'adm.financeiro',
+      detalhe: `Cadastro do estudante ${updatedFields.nome || targetStudent?.nome} (Matrícula: ${updatedFields.matricula || targetStudent?.matricula}) atualizado.`,
+      sucesso: true
+    };
+    setLogs(prev => [newLog, ...prev]);
+    postToastAlert(`Estudante ${updatedFields.nome || targetStudent?.nome} atualizado com sucesso!`, 'success');
+  };
+
   // Core Conditional router rendering
   const renderCurrentView = () => {
     switch (currentTab) {
@@ -884,9 +922,11 @@ export default function App() {
             <StudentsView
               alunos={alunos}
               polos={polos}
+              cursos={cursos}
               onSelectStudent={handleSelectStudentJump}
               onFastWhatsAppNotification={handleFastWhatsAppNotification}
               onAddAlunos={handleAddAlunos}
+              onUpdateAluno={handleUpdateAluno}
               onDeleteAluno={handleDeleteAluno}
               onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
             />
@@ -954,6 +994,8 @@ export default function App() {
               onClearDatabase={handleClearDatabase}
               polos={polos}
               onUpdatePolos={setPolos}
+              cursos={cursos}
+              onUpdateCursos={setCursos}
               alunos={alunos}
               users={users}
               onUpdateUsers={setUsers}

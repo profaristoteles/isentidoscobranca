@@ -20,7 +20,8 @@ import {
   Plus,
   Trash2,
   Smartphone,
-  Globe
+  Globe,
+  GraduationCap
 } from 'lucide-react';
 import { Aluno, Colaborador } from '../types';
 import { checkConnectionStatus } from '../services/whatsappService';
@@ -33,6 +34,8 @@ interface ConfiguracoesViewProps {
   onClearDatabase: () => void;
   polos: string[];
   onUpdatePolos: (newPolos: string[]) => void;
+  cursos: string[];
+  onUpdateCursos: (newCursos: string[]) => void;
   alunos: Aluno[];
   users: Colaborador[];
   onUpdateUsers: (newUsers: Colaborador[]) => void;
@@ -52,6 +55,8 @@ export default function ConfiguracoesView({
   onClearDatabase, 
   polos, 
   onUpdatePolos, 
+  cursos,
+  onUpdateCursos,
   alunos,
   users,
   onUpdateUsers
@@ -70,7 +75,7 @@ export default function ConfiguracoesView({
 
   const [lgpdConsent, setLgpdConsent] = useState(true);
   const [lgpdAnonCpf, setLgpdAnonCpf] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS'>(() => {
+  const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'CURSOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS'>(() => {
     return (safeGetItem('sentidos_active_subtab') as any) || 'USERS';
   });
   
@@ -178,6 +183,34 @@ export default function ConfiguracoesView({
     }
   };
 
+  const [novoCursoNome, setNovoCursoNome] = useState('');
+
+  const handleAddCurso = () => {
+    const trimmed = novoCursoNome.trim();
+    if (!trimmed) {
+      onPostAlert('O nome do curso não pode estar vazio.', 'warning');
+      return;
+    }
+    if (cursos.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      onPostAlert('Este curso já está cadastrado.', 'warning');
+      return;
+    }
+    onUpdateCursos([...cursos, trimmed]);
+    setNovoCursoNome('');
+    onPostAlert(`Curso "${trimmed}" cadastrado com sucesso!`, 'success');
+  };
+
+  const handleDeleteCurso = (cursoName: string, qtdAlunos: number) => {
+    if (qtdAlunos > 0) {
+      onPostAlert(`Não é possível excluir o curso "${cursoName}" porque existem ${qtdAlunos} alunos vinculados a ele. Realoque-os primeiro.`, 'error');
+      return;
+    }
+    if (window.confirm(`Tem certeza que deseja remover o curso "${cursoName}"?`)) {
+      onUpdateCursos(cursos.filter(c => c !== cursoName));
+      onPostAlert(`Curso "${cursoName}" removido com sucesso.`, 'success');
+    }
+  };
+
   // Add mock administrator
   const handleRegisterColaborador = (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,6 +311,16 @@ export default function ConfiguracoesView({
           >
             <MapPin className="h-4.5 w-4.5" />
             <span>Polos Acadêmicos</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('CURSOS')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2.5 transition cursor-pointer ${
+              activeSubTab === 'CURSOS' ? 'bg-[#03045e] text-white' : 'text-gray-600 hover:bg-slate-50'
+            }`}
+          >
+            <GraduationCap className="h-4.5 w-4.5" />
+            <span>Cursos Acadêmicos</span>
           </button>
 
           <button
@@ -547,6 +590,68 @@ export default function ConfiguracoesView({
                           onClick={() => handleDeletePolo(polo, qtdAlunos)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
                           title="Excluir Polo"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SubTab: Cursos Acadêmicos */}
+          {activeSubTab === 'CURSOS' && (
+            <div className="space-y-4">
+              <div className="border-b border-gray-50 pb-3">
+                <h3 className="text-sm font-bold text-gray-900">Cursos Acadêmicos</h3>
+                <p className="text-xs text-gray-400">Cadastre e gerencie os cursos oferecidos para seleção no cadastro de alunos</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Adicionar Curso */}
+                <div className="space-y-3 p-4 bg-slate-50 border border-slate-100 rounded-xl h-fit">
+                  <p className="text-xs font-bold text-gray-800">Cadastrar Novo Curso</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nome do Curso (ex: Pós-Graduação em ABA)"
+                      value={novoCursoNome}
+                      onChange={(e) => setNovoCursoNome(e.target.value)}
+                      className="flex-1 bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                    <button
+                      onClick={handleAddCurso}
+                      className="bg-[#03045e] hover:bg-blue-900 text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Adicionar</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lista de Cursos */}
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  <p className="text-xs font-bold text-gray-800 mb-1">Cursos Cadastrados ({cursos.length})</p>
+                  {cursos.map((curso) => {
+                    const qtdAlunos = alunos.filter(a => a.curso === curso).length;
+                    return (
+                      <div key={curso} className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs flex justify-between items-center transition hover:bg-slate-100/50">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                          <div className="p-1.5 bg-[#03045e]/10 rounded text-[#03045e] shrink-0">
+                            <GraduationCap className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-gray-800 truncate" title={curso}>{curso}</p>
+                            <p className="text-[10px] text-gray-400 font-semibold">{qtdAlunos} {qtdAlunos === 1 ? 'estudante' : 'estudantes'} vinculado(s)</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteCurso(curso, qtdAlunos)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer shrink-0"
+                          title="Excluir Curso"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

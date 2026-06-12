@@ -176,14 +176,9 @@ export async function sendTextMessage(numberStr: string, text: string): Promise<
 
   const payload = {
     number: sanitizedNumber,
-    options: {
-      delay: 1200,
-      presence: 'composing',
-      linkPreview: true
-    },
-    textMessage: {
-      text: text
-    }
+    text: text,
+    delay: 1200,
+    linkPreview: true
   };
 
   try {

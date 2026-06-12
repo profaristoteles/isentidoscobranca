@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   Filter, 
@@ -13,16 +13,19 @@ import {
   Ban, 
   UserPlus,
   X,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { Aluno } from '../types';
 
 interface StudentsViewProps {
   alunos: Aluno[];
   polos: string[];
+  cursos: string[];
   onSelectStudent: (studentId: string) => void;
   onFastWhatsAppNotification: (student: Aluno) => void;
   onAddAlunos: (novosAlunos: Omit<Aluno, 'id' | 'matricula' | 'valorPendente' | 'statusFinanceiro' | 'cadastroData'>[]) => Aluno[];
+  onUpdateAluno: (alunoId: string, updatedFields: Partial<Aluno>) => void;
   onDeleteAluno: (alunoId: string) => void;
   onToggleCobrancaAutomatica: (alunoId: string) => void;
 }
@@ -30,9 +33,11 @@ interface StudentsViewProps {
 export default function StudentsView({ 
   alunos, 
   polos,
+  cursos,
   onSelectStudent, 
   onFastWhatsAppNotification, 
   onAddAlunos,
+  onUpdateAluno,
   onDeleteAluno,
   onToggleCobrancaAutomatica
 }: StudentsViewProps) {
@@ -44,6 +49,34 @@ export default function StudentsView({
   // Modal & Tabs
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'INDIVIDUAL' | 'MASSA'>('INDIVIDUAL');
+  
+  // State to track student editing
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+
+  // Pre-populate fields on edit
+  useEffect(() => {
+    if (editingStudentId) {
+      const student = alunos.find(a => a.id === editingStudentId);
+      if (student) {
+        setNome(student.nome);
+        setEmail(student.email);
+        setCpf(student.cpf);
+        setWhatsapp(student.whatsapp);
+        setCurso(student.curso);
+        setPolo(student.polo);
+        setModalidade(student.modalidade);
+        setTurma(student.turma || '');
+        setValorMensalidade(student.valorMensalidade !== undefined ? String(student.valorMensalidade) : '');
+        setTotalParcelas(student.totalParcelas !== undefined ? String(student.totalParcelas) : '');
+        setParcelasPagas(student.parcelasPagas !== undefined ? String(student.parcelasPagas) : '');
+        setPrimeiroVencimento(student.primeiroVencimentoEmAberto || '');
+        setDiaVencimento(student.diaVencimento !== undefined ? String(student.diaVencimento) : '');
+        setDataMatricula(student.dataMatriculaFinanceira || '');
+      }
+    } else {
+      resetForm();
+    }
+  }, [editingStudentId, alunos]);
   
   // Individual fields
   const [nome, setNome] = useState('');
@@ -170,24 +203,44 @@ export default function StudentsView({
     e.preventDefault();
     if (!nome || !email || !cpf || !whatsapp || !curso) return;
 
-    onAddAlunos([{
-      nome,
-      email,
-      cpf,
-      whatsapp,
-      curso,
-      polo,
-      modalidade,
-      turma: turma.trim() || undefined,
-      valorMensalidade: numOrUndef(valorMensalidade),
-      totalParcelas: numOrUndef(totalParcelas),
-      parcelasPagas: numOrUndef(parcelasPagas) ?? 0,
-      primeiroVencimentoEmAberto: primeiroVencimento.trim() || undefined,
-      diaVencimento: numOrUndef(diaVencimento),
-      dataMatriculaFinanceira: dataMatricula.trim() || undefined
-    }]);
+    if (editingStudentId) {
+      onUpdateAluno(editingStudentId, {
+        nome,
+        email,
+        cpf,
+        whatsapp,
+        curso,
+        polo,
+        modalidade,
+        turma: turma.trim() || undefined,
+        valorMensalidade: numOrUndef(valorMensalidade),
+        totalParcelas: numOrUndef(totalParcelas),
+        parcelasPagas: numOrUndef(parcelasPagas) ?? 0,
+        primeiroVencimentoEmAberto: primeiroVencimento.trim() || undefined,
+        diaVencimento: numOrUndef(diaVencimento),
+        dataMatriculaFinanceira: dataMatricula.trim() || undefined
+      });
+    } else {
+      onAddAlunos([{
+        nome,
+        email,
+        cpf,
+        whatsapp,
+        curso,
+        polo,
+        modalidade,
+        turma: turma.trim() || undefined,
+        valorMensalidade: numOrUndef(valorMensalidade),
+        totalParcelas: numOrUndef(totalParcelas),
+        parcelasPagas: numOrUndef(parcelasPagas) ?? 0,
+        primeiroVencimentoEmAberto: primeiroVencimento.trim() || undefined,
+        diaVencimento: numOrUndef(diaVencimento),
+        dataMatriculaFinanceira: dataMatricula.trim() || undefined
+      }]);
+    }
 
     setShowModal(false);
+    setEditingStudentId(null);
     resetForm();
   };
 
@@ -451,6 +504,19 @@ export default function StudentsView({
                         >
                           <Eye className="h-4.5 w-4.5" />
                         </button>
+
+                        {/* Edit Student */}
+                        <button 
+                          onClick={() => {
+                            setEditingStudentId(student.id);
+                            setActiveTab('INDIVIDUAL');
+                            setShowModal(true);
+                          }}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
+                          title="Editar Aluno"
+                        >
+                          <Pencil className="h-4.5 w-4.5" />
+                        </button>
                         
                         {/* Send Immediate WhatsApp Warning */}
                         <button 
@@ -505,11 +571,15 @@ export default function StudentsView({
             {/* Header */}
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-[#03045e] text-white">
               <div>
-                <h3 className="font-bold text-sm">Cadastrar Novo Aluno</h3>
-                <p className="text-[10px] text-gray-200 mt-0.5">Adicione dados individualmente ou importe em massa via arquivo CSV.</p>
+                <h3 className="font-bold text-sm">
+                  {editingStudentId ? 'Editar Cadastro do Aluno' : 'Cadastrar Novo Aluno'}
+                </h3>
+                <p className="text-[10px] text-gray-200 mt-0.5">
+                  {editingStudentId ? 'Atualize as informações cadastrais do aluno.' : 'Adicione dados individualmente ou importe em massa via arquivo CSV.'}
+                </p>
               </div>
               <button 
-                onClick={() => { setShowModal(false); resetForm(); }}
+                onClick={() => { setShowModal(false); setEditingStudentId(null); resetForm(); }}
                 className="p-1.5 hover:bg-white/10 rounded-lg transition text-white/80 hover:text-white cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -517,30 +587,32 @@ export default function StudentsView({
             </div>
 
             {/* Tabs Selector */}
-            <div className="flex border-b border-gray-150 bg-gray-50/50">
-              <button
-                type="button"
-                onClick={() => setActiveTab('INDIVIDUAL')}
-                className={`flex-1 py-3 text-center text-xs font-bold border-b-2 transition cursor-pointer ${
-                  activeTab === 'INDIVIDUAL' 
-                    ? 'border-[#ff8000] text-[#03045e]' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-                }`}
-              >
-                Cadastro Individual
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('MASSA')}
-                className={`flex-1 py-3 text-center text-xs font-bold border-b-2 transition cursor-pointer ${
-                  activeTab === 'MASSA' 
-                    ? 'border-[#ff8000] text-[#03045e]' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-                }`}
-              >
-                Importar em Massa (CSV/Texto)
-              </button>
-            </div>
+            {!editingStudentId && (
+              <div className="flex border-b border-gray-150 bg-gray-50/50">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('INDIVIDUAL')}
+                  className={`flex-1 py-3 text-center text-xs font-bold border-b-2 transition cursor-pointer ${
+                    activeTab === 'INDIVIDUAL' 
+                      ? 'border-[#ff8000] text-[#03045e]' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
+                  }`}
+                >
+                  Cadastro Individual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('MASSA')}
+                  className={`flex-1 py-3 text-center text-xs font-bold border-b-2 transition cursor-pointer ${
+                    activeTab === 'MASSA' 
+                      ? 'border-[#ff8000] text-[#03045e]' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
+                  }`}
+                >
+                  Importar em Massa (CSV/Texto)
+                </button>
+              </div>
+            )}
 
             {/* Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -599,14 +671,17 @@ export default function StudentsView({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Curso / Pós-Graduação *</label>
-                      <input
-                        type="text"
+                      <select
                         required
                         value={curso}
                         onChange={(e) => setCurso(e.target.value)}
-                        placeholder="Ex: Pós-Graduação em Neuropsicologia Clínica"
                         className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#03045e]"
-                      />
+                      >
+                        <option value="" disabled>Selecione um curso</option>
+                        {cursos.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Polo Acadêmico *</label>
@@ -768,8 +843,8 @@ export default function StudentsView({
             <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => { setShowModal(false); resetForm(); }}
-                className="px-4 py-2 border border-gray-200 hover:bg-gray-100 text-gray-600 font-semibold text-xs rounded-lg transition cursor-pointer"
+                onClick={() => { setShowModal(false); setEditingStudentId(null); resetForm(); }}
+                className="px-4 py-2 border border-gray-200 hover:bg-gray-150 hover:bg-gray-100 text-gray-650 text-gray-650 text-gray-600 font-semibold text-xs rounded-lg transition cursor-pointer"
               >
                 Cancelar
               </button>
@@ -779,7 +854,7 @@ export default function StudentsView({
                   form="form-individual"
                   className="px-4 py-2 bg-[#03045e] hover:bg-blue-900 text-white font-bold text-xs rounded-lg transition cursor-pointer shadow-xs"
                 >
-                  Confirmar Cadastro
+                  {editingStudentId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
                 </button>
               ) : (
                 <button

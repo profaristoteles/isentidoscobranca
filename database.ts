@@ -12,7 +12,8 @@ import {
   INITIAL_CRM_CONFIG,
   INITIAL_LOGS_ATIVIDADE,
   INITIAL_POLOS,
-  INITIAL_USERS
+  INITIAL_USERS,
+  INITIAL_CURSOS
 } from './src/mockData';
 
 dotenv.config();
@@ -31,6 +32,7 @@ export interface DbData {
   crmConfig: any;
   logs: any[];
   polos: string[];
+  cursos: string[];
   users: any[];
 }
 
@@ -44,6 +46,7 @@ export function getInitialData(): DbData {
     crmConfig: INITIAL_CRM_CONFIG,
     logs: INITIAL_LOGS_ATIVIDADE,
     polos: INITIAL_POLOS,
+    cursos: INITIAL_CURSOS,
     users: INITIAL_USERS
   };
 }
@@ -158,6 +161,10 @@ function readDBJson(): DbData {
       parsed.polos = INITIAL_POLOS;
       updated = true;
     }
+    if (!parsed.cursos) {
+      parsed.cursos = INITIAL_CURSOS;
+      updated = true;
+    }
     if (!parsed.users) {
       parsed.users = INITIAL_USERS;
       updated = true;
@@ -228,6 +235,10 @@ export async function initDb(): Promise<void> {
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS polos (
+        nome VARCHAR(255) PRIMARY KEY
+      );
+ 
+      CREATE TABLE IF NOT EXISTS cursos (
         nome VARCHAR(255) PRIMARY KEY
       );
 
@@ -394,6 +405,7 @@ export async function readDB(): Promise<DbData> {
       crmRes,
       logsRes,
       polosRes,
+      cursosRes,
       usersRes
     ] = await Promise.all([
       pool.query('SELECT * FROM alunos ORDER BY nome ASC'),
@@ -404,6 +416,7 @@ export async function readDB(): Promise<DbData> {
       pool.query('SELECT * FROM crm_config WHERE id = 1'),
       pool.query('SELECT * FROM logs ORDER BY timestamp DESC'),
       pool.query('SELECT * FROM polos ORDER BY nome ASC'),
+      pool.query('SELECT * FROM cursos ORDER BY nome ASC'),
       pool.query('SELECT * FROM users ORDER BY name ASC')
     ]);
 
@@ -433,6 +446,7 @@ export async function readDB(): Promise<DbData> {
       },
       logs: logsRes.rows,
       polos: polosRes.rows.map(p => p.nome),
+      cursos: cursosRes.rows.map(c => c.nome),
       users: usersRes.rows
     };
   } catch (error) {
@@ -452,11 +466,17 @@ export async function writeDB(data: DbData): Promise<void> {
   try {
     await client.query('BEGIN');
 
-    await client.query('TRUNCATE TABLE polos, users, alunos, parcelas, parcela_historico, mensagens, regras, crm_config, logs RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE TABLE polos, cursos, users, alunos, parcelas, parcela_historico, mensagens, regras, crm_config, logs RESTART IDENTITY CASCADE');
 
     if (Array.isArray(data.polos)) {
       for (const polo of data.polos) {
         await client.query('INSERT INTO polos (nome) VALUES ($1)', [polo]);
+      }
+    }
+
+    if (Array.isArray(data.cursos)) {
+      for (const curso of data.cursos) {
+        await client.query('INSERT INTO cursos (nome) VALUES ($1)', [curso]);
       }
     }
 

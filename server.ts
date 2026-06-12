@@ -119,7 +119,7 @@ app.post('/api/save-all', async (req, res) => {
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ success: false, message: 'Dados inválidos' });
   }
-  const required = ['alunos', 'parcelas', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'users'];
+  const required = ['alunos', 'parcelas', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'cursos', 'users'];
   const hasRequired = required.every(key => key in data);
   if (!hasRequired) {
     return res.status(400).json({ success: false, message: 'Dados incompletos para persistência' });

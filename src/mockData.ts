@@ -12,6 +12,14 @@ import { generateParcelas, novoHistorico } from './utils/parcelas';
 
 export const INITIAL_POLOS: string[] = ['Teresina (Sede)', 'Parnaíba', 'Floriano', 'Picos'];
 
+export const INITIAL_CURSOS: string[] = [
+  'Pós-Graduação em Neuropsicologia Clínica',
+  'Especialização em Análise do Comportamento Aplicada (ABA)',
+  'Pós-Graduação em Psicopedagogia Institucional',
+  'Aperfeiçoamento em Transtorno do Espectro Autista (TEA)',
+  'MBA em Gestão Escolar e Políticas Públicas'
+];
+
 export const INITIAL_ALUNOS: Aluno[] = [
   {
     id: 'student-1',
