@@ -26,7 +26,8 @@ services:
         max-file: "3"
 
   sentidos_cobrancas:
-    build: .
+    image: ghcr.io/profaristoteles/isentidoscobranca:latest
+    pull_policy: always
     container_name: siscobra_app
     restart: always
     environment:
