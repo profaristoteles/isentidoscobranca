@@ -977,7 +977,7 @@ export default function App() {
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 h-full relative">
+      <div className="flex-1 flex flex-col min-w-0 h-full relative lg:pl-64">
         <Topbar
           currentTab={currentTab}
           crmSynced={crmConfig.sincronizacaoAtiva}
