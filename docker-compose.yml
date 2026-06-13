@@ -14,7 +14,7 @@ services:
     networks:
       - siscobra_internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentidos_user"]
+      test: ["CMD-SHELL", "pg_isready -d ${DB_NAME:-sentidos_cobrancas} -U ${DB_USER:-sentidos_user}"]
       interval: 10s
       timeout: 5s
       retries: 10
