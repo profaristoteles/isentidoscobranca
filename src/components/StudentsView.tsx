@@ -14,7 +14,8 @@ import {
   UserPlus,
   X,
   Trash2,
-  Pencil
+  Pencil,
+  GraduationCap
 } from 'lucide-react';
 import { Aluno } from '../types';
 
@@ -45,6 +46,7 @@ export default function StudentsView({
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterCurso, setFilterCurso] = useState<string>('ALL');
   const [filterModalidade, setFilterModalidade] = useState<string>('ALL');
+  const [filterSituacao, setFilterSituacao] = useState<string>('ALL');
 
   // Modal & Tabs
   const [showModal, setShowModal] = useState(false);
@@ -65,6 +67,7 @@ export default function StudentsView({
         setCurso(student.curso);
         setPolo(student.polo);
         setModalidade(student.modalidade);
+        setSituacaoAcademica(student.situacaoAcademica || 'ATIVO');
         setTurma(student.turma || '');
         setValorMensalidade(student.valorMensalidade !== undefined ? String(student.valorMensalidade) : '');
         setTotalParcelas(student.totalParcelas !== undefined ? String(student.totalParcelas) : '');
@@ -86,6 +89,7 @@ export default function StudentsView({
   const [curso, setCurso] = useState('');
   const [polo, setPolo] = useState(polos[0] || 'Teresina (Sede)');
   const [modalidade, setModalidade] = useState<'Presencial' | 'Online'>('Presencial');
+  const [situacaoAcademica, setSituacaoAcademica] = useState<'ATIVO' | 'CONCLUIDO' | 'EGRESSO_DEVEDOR'>('ATIVO');
 
   // Matrícula financeira fields
   const [turma, setTurma] = useState('');
@@ -109,6 +113,7 @@ export default function StudentsView({
     setCurso('');
     setPolo(polos[0] || 'Teresina (Sede)');
     setModalidade('Presencial');
+    setSituacaoAcademica('ATIVO');
     setTurma('');
     setValorMensalidade('');
     setTotalParcelas('');
@@ -212,6 +217,7 @@ export default function StudentsView({
         curso,
         polo,
         modalidade,
+        situacaoAcademica,
         turma: turma.trim() || undefined,
         valorMensalidade: numOrUndef(valorMensalidade),
         totalParcelas: numOrUndef(totalParcelas),
@@ -229,6 +235,7 @@ export default function StudentsView({
         curso,
         polo,
         modalidade,
+        situacaoAcademica,
         turma: turma.trim() || undefined,
         valorMensalidade: numOrUndef(valorMensalidade),
         totalParcelas: numOrUndef(totalParcelas),
@@ -276,9 +283,13 @@ export default function StudentsView({
       const matchesModalidade = 
         filterModalidade === 'ALL' || student.modalidade === filterModalidade;
 
-      return matchesSearch && matchesStatus && matchesCurso && matchesModalidade;
+      const matchesSituacao =
+        filterSituacao === 'ALL' ||
+        (filterSituacao === 'EGRESSO_DEVEDOR' ? student.situacaoAcademica === 'EGRESSO_DEVEDOR' : student.situacaoAcademica !== 'EGRESSO_DEVEDOR');
+
+      return matchesSearch && matchesStatus && matchesCurso && matchesModalidade && matchesSituacao;
     });
-  }, [alunos, search, filterStatus, filterCurso, filterModalidade]);
+  }, [alunos, search, filterStatus, filterCurso, filterModalidade, filterSituacao]);
 
   // Get financial status styles
   const getStatusBadge = (status: Aluno['statusFinanceiro']) => {
@@ -333,6 +344,10 @@ export default function StudentsView({
           <div className="bg-[#03045e]/5 px-3 py-1.8 rounded-lg border border-[#03045e]/10 text-xs">
             <span className="text-gray-505 text-gray-600">Inadimplentes Ativos:</span>{' '}
             <strong className="text-red-700">{alunos.filter(a => a.statusFinanceiro === 'INADIMPLENTE').length}</strong>
+          </div>
+          <div className="bg-amber-50 px-3 py-1.8 rounded-lg border border-amber-200 text-xs">
+            <span className="text-amber-700">Egressos com Dívida:</span>{' '}
+            <strong className="text-amber-800">{alunos.filter(a => a.situacaoAcademica === 'EGRESSO_DEVEDOR').length}</strong>
           </div>
         </div>
       </div>
@@ -395,14 +410,29 @@ export default function StudentsView({
             </select>
           </div>
 
+          {/* Situacao Academica filter */}
+          <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs text-amber-700">
+            <GraduationCap className="h-3.5 w-3.5 text-amber-500" />
+            <select 
+              value={filterSituacao}
+              onChange={(e) => setFilterSituacao(e.target.value)}
+              className="bg-transparent border-0 focus:outline-hidden text-xs cursor-pointer font-medium"
+            >
+              <option value="ALL">Todos (ativo + egresso)</option>
+              <option value="ATIVO">Somente Ativos</option>
+              <option value="EGRESSO_DEVEDOR">🎓 Egressos com Dívida</option>
+            </select>
+          </div>
+
           {/* Quick Clear Button */}
-          {(search || filterStatus !== 'ALL' || filterCurso !== 'ALL' || filterModalidade !== 'ALL') && (
+          {(search || filterStatus !== 'ALL' || filterCurso !== 'ALL' || filterModalidade !== 'ALL' || filterSituacao !== 'ALL') && (
             <button 
               onClick={() => {
                 setSearch('');
                 setFilterStatus('ALL');
                 setFilterCurso('ALL');
                 setFilterModalidade('ALL');
+                setFilterSituacao('ALL');
               }}
               className="px-3 py-1 bg-gray-100 hover:bg-gray-255 text-gray-600 rounded-lg text-xs font-semibold cursor-pointer transition"
             >
@@ -445,7 +475,12 @@ export default function StudentsView({
                             <span onClick={() => onSelectStudent(student.id)} className="font-bold text-gray-900 hover:text-blue-700 cursor-pointer transition">
                               {student.nome}
                             </span>
-                            {student.modalidade === 'Online' ? (
+                            {student.situacaoAcademica === 'EGRESSO_DEVEDOR' ? (
+                              <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 border border-amber-300 rounded text-[9px] font-bold flex items-center gap-0.5">
+                                <GraduationCap className="h-2.5 w-2.5" />
+                                EGRESSO
+                              </span>
+                            ) : student.modalidade === 'Online' ? (
                               <span className="px-1.5 py-0.2 bg-orange-100 text-orange-700 border border-orange-200 rounded text-[9px] font-bold">Online</span>
                             ) : (
                               <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 border border-blue-200 rounded text-[9px] font-bold">Presencial</span>
@@ -706,6 +741,25 @@ export default function StudentsView({
                         <option value="Online">Online</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Situacao Academica - destaque */}
+                  <div className="p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl">
+                    <label className="block text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">🎓 Situação Acadêmica do Aluno</label>
+                    <select
+                      value={situacaoAcademica}
+                      onChange={(e) => setSituacaoAcademica(e.target.value as 'ATIVO' | 'CONCLUIDO' | 'EGRESSO_DEVEDOR')}
+                      className="w-full px-3 py-2 text-xs border border-amber-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-amber-500 bg-white"
+                    >
+                      <option value="ATIVO">Ativo — Ainda cursando normalmente</option>
+                      <option value="CONCLUIDO">Concluído — Curso finalizado, sem pendências</option>
+                      <option value="EGRESSO_DEVEDOR">Egresso com Dívida — Curso finalizado, com mensalidades em aberto</option>
+                    </select>
+                    {situacaoAcademica === 'EGRESSO_DEVEDOR' && (
+                      <p className="text-[10px] text-amber-700 mt-1.5 font-medium">
+                        ⚠️ As parcelas serão geradas automaticamente como <strong>ATRASADO</strong>. Preencha abaixo o histórico financeiro (mensalidade, total, pagas e 1º vencimento em aberto).
+                      </p>
+                    )}
                   </div>
 
                   {/* Matrícula Financeira */}

@@ -16,6 +16,7 @@ export interface Aluno {
   cadastroData: string;
   modalidade: 'Presencial' | 'Online';
   cobrancaAutomatica?: boolean;
+  situacaoAcademica?: 'ATIVO' | 'CONCLUIDO' | 'EGRESSO_DEVEDOR'; // novo: situação do vínculo acadêmico
 
   // Matrícula financeira (contrato)
   turma?: string;
