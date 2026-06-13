@@ -71,7 +71,12 @@ export default function ConfirmarEnvioModal({
       }
     } else {
       // Default fallback template if no rule is selected
-      const defaultRule = regras.find(r => r.ativo && (canal === 'EMAIL' ? r.canal === 'EMAIL' || r.canal === 'AMBOS' : r.canal === 'WHATSAPP' || r.canal === 'AMBOS'));
+      // Treat undefined canal as WHATSAPP (backwards compatibility with old rules)
+      const defaultRule = regras.find(r => r.ativo && (
+        canal === 'EMAIL'
+          ? r.canal === 'EMAIL' || r.canal === 'AMBOS'
+          : r.canal === 'WHATSAPP' || r.canal === 'AMBOS' || !r.canal
+      ));
       if (defaultRule) {
         setSelectedRuleId(defaultRule.id);
         template = defaultRule.mensagemTemplate;
