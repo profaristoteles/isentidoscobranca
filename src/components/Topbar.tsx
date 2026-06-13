@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
   Search, 
@@ -47,7 +47,17 @@ export default function Topbar({
     }
   };
 
-  const currentDateTimeString = '22 de Maio de 2026, 12:39';
+  // Live clock — ticks every second using the real browser clock
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const currentDateTimeString = now.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) + ', ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   const mockAlerts = [
     { id: 1, title: 'Parcela Vencida', text: 'Camila Guimarães está há 15 dias atrasada.', time: 'Há 5m', read: false },
@@ -93,10 +103,10 @@ export default function Topbar({
         <div className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
           isUsingApi 
             ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-            : 'bg-amber-50 text-amber-700 border-amber-200'
+            : 'bg-slate-100 text-slate-600 border-slate-200'
         }`}>
-          <Bookmark className={`h-3 w-3 ${isUsingApi ? 'text-emerald-600' : 'text-amber-600'}`} />
-          <span className="font-semibold text-[10px]">BANCO: {isUsingApi ? 'CONECTADO (LOCAL)' : 'DESCONECTADO (L.S.)'}</span>
+          <Bookmark className={`h-3 w-3 ${isUsingApi ? 'text-emerald-600' : 'text-slate-500'}`} />
+          <span className="font-semibold text-[10px]">BANCO: {isUsingApi ? 'CONECTADO' : 'MODO LOCAL'}</span>
         </div>
 
         {/* Status indicator: Whatsapp connected */}
@@ -121,7 +131,7 @@ export default function Topbar({
 
         {/* Date tracker */}
         <div className="text-right hidden xl:block">
-          <p className="text-[10px] text-gray-400 font-medium">Data Local do Servidor</p>
+          <p className="text-[10px] text-gray-400 font-medium">Data e Hora Atual</p>
           <p className="text-xs font-semibold text-gray-700 font-mono">{currentDateTimeString}</p>
         </div>
 
