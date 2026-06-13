@@ -79,6 +79,8 @@ export interface CobrancaRegra {
   mensagemTemplate: string;
   ativo: boolean;
   horarioEnvio: string;
+  canal?: 'WHATSAPP' | 'EMAIL' | 'AMBOS';
+  destinatario?: 'ALUNO' | 'EQUIPE_INTERNA';
 }
 
 export interface CrmConfig {
@@ -115,3 +117,19 @@ export interface Colaborador {
   role: 'Administrador' | 'Financeiro' | 'Secretaria';
   active: boolean;
 }
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  fromEmail: string;
+  fromName: string;
+  secure: boolean;
+  active: boolean;
+}
+
+export interface GlobalSettings {
+  teamPhoneNumber: string;
+}
+

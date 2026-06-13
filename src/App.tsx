@@ -19,6 +19,7 @@ import CobrancasRulesView from './components/CobrancasRulesView';
 import WhatsAppView from './components/WhatsAppView';
 import CRMView from './components/CRMView';
 import ConfiguracoesView from './components/ConfiguracoesView';
+import ConfirmarEnvioModal from './components/ConfirmarEnvioModal';
 import {
   isEvolutionConfigured,
   checkConnectionStatus,
@@ -35,7 +36,9 @@ import {
   CobrancaRegra,
   CrmConfig,
   LogAtividade,
-  Colaborador
+  Colaborador,
+  SmtpConfig,
+  GlobalSettings
 } from './types';
 import {
   INITIAL_ALUNOS,
@@ -120,6 +123,30 @@ export default function App() {
     return safeParseJson(safeGetItem('sentidos_users'), INITIAL_USERS);
   });
 
+  const [smtpConfig, setSmtpConfig] = useState<SmtpConfig>(() => {
+    return safeParseJson(safeGetItem('sentidos_smtpConfig'), {
+      host: 'smtp.zeptomail.com',
+      port: 587,
+      user: 'emailapikey',
+      pass: '',
+      fromEmail: '',
+      fromName: 'Instituto Sentidos',
+      secure: false,
+      active: false
+    });
+  });
+
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(() => {
+    return safeParseJson(safeGetItem('sentidos_globalSettings'), {
+      teamPhoneNumber: ''
+    });
+  });
+
+  // Confirmar Envio Modal States
+  const [isConfirmarModalOpen, setIsConfirmarModalOpen] = useState(false);
+  const [confirmarModalAluno, setConfirmarModalAluno] = useState<Aluno | null>(null);
+  const [confirmarModalParcela, setConfirmarModalParcela] = useState<Parcela | null>(null);
+
   // LocalStorage sync effects
   useEffect(() => { safeSetItem('sentidos_polos', JSON.stringify(polos)); }, [polos]);
   useEffect(() => { safeSetItem('sentidos_cursos', JSON.stringify(cursos)); }, [cursos]);
@@ -131,6 +158,8 @@ export default function App() {
   useEffect(() => { safeSetItem('sentidos_crmConfig', JSON.stringify(crmConfig)); }, [crmConfig]);
   useEffect(() => { safeSetItem('sentidos_logs', JSON.stringify(logs)); }, [logs]);
   useEffect(() => { safeSetItem('sentidos_users', JSON.stringify(users)); }, [users]);
+  useEffect(() => { safeSetItem('sentidos_smtpConfig', JSON.stringify(smtpConfig)); }, [smtpConfig]);
+  useEffect(() => { safeSetItem('sentidos_globalSettings', JSON.stringify(globalSettings)); }, [globalSettings]);
   useEffect(() => { safeSetItem('sentidos_current_tab', currentTab); }, [currentTab]);
   useEffect(() => {
     if (selectedStudentId) {
@@ -172,6 +201,8 @@ export default function App() {
           if (data.polos) setIfChanged(setPolos, data.polos);
           if (data.cursos) setIfChanged(setCursos, data.cursos);
           if (data.users) setIfChanged(setUsers, data.users);
+          if (data.smtpConfig) setIfChanged(setSmtpConfig, data.smtpConfig);
+          if (data.globalSettings) setIfChanged(setGlobalSettings, data.globalSettings);
 
           setIsUsingApi(true);
           console.log('[Sentidos Cobranças] Banco de dados carregado com sucesso do backend.');
@@ -210,6 +241,8 @@ export default function App() {
           if (data.polos) setIfChanged(setPolos, data.polos);
           if (data.cursos) setIfChanged(setCursos, data.cursos);
           if (data.users) setIfChanged(setUsers, data.users);
+          if (data.smtpConfig) setIfChanged(setSmtpConfig, data.smtpConfig);
+          if (data.globalSettings) setIfChanged(setGlobalSettings, data.globalSettings);
         }
       } catch (err) {
         console.warn('[Sentidos Cobranças] Erro ao buscar atualizações em segundo plano:', err);
@@ -252,7 +285,9 @@ export default function App() {
             logs,
             polos,
             cursos,
-            users
+            users,
+            smtpConfig,
+            globalSettings
           })
         });
         if (!response.ok) {
@@ -267,7 +302,7 @@ export default function App() {
 
     const timeoutId = setTimeout(syncToBackend, 500);
     return () => clearTimeout(timeoutId);
-  }, [alunos, parcelas, parcelaHistorico, mensagens, regras, crmConfig, logs, polos, cursos, users, dbLoaded, isUsingApi]);
+  }, [alunos, parcelas, parcelaHistorico, mensagens, regras, crmConfig, logs, polos, cursos, users, smtpConfig, globalSettings, dbLoaded, isUsingApi]);
 
   // Connection states
   const [whatsappOnline, setWhatsappOnline] = useState<boolean>(true);
@@ -692,9 +727,152 @@ export default function App() {
   const handleFastWhatsAppNotification = (student: Aluno) => {
     const outstanding = parcelas.find(p => p.alunoId === student.id && (p.status === 'PENDENTE' || p.status === 'ATRASADO'));
     if (outstanding) {
-      handleTriggerSingleParcelaWhatsApp(outstanding);
+      handleOpenConfirmarModal(outstanding);
     } else {
       postToastAlert(`${student.nome} não apresenta parcelas em aberto no momento.`, 'warning');
+    }
+  };
+
+  const handleOpenConfirmarModal = (parcela: Parcela) => {
+    const student = alunos.find(a => a.id === parcela.alunoId);
+    if (!student) return;
+    setConfirmarModalAluno(student);
+    setConfirmarModalParcela(parcela);
+    setIsConfirmarModalOpen(true);
+  };
+
+  const handleSendCustomCobranca = async (
+    canal: 'WHATSAPP' | 'EMAIL',
+    text: string,
+    subject?: string,
+    destinatario?: 'ALUNO' | 'EQUIPE_INTERNA'
+  ) => {
+    if (!confirmarModalAluno || !confirmarModalParcela) return;
+    const student = confirmarModalAluno;
+    const parcela = confirmarModalParcela;
+
+    let apiSuccess = true;
+    let apiErrorMsg = '';
+
+    const nowTime = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    if (canal === 'WHATSAPP') {
+      let targetNumber = student.whatsapp;
+      let logDestName = student.nome;
+
+      if (destinatario === 'EQUIPE_INTERNA') {
+        const teamNum = globalSettings?.teamPhoneNumber || '';
+        if (!teamNum.trim()) {
+          postToastAlert('WhatsApp da equipe interna não configurado! Disparando para o aluno como fallback.', 'warning');
+        } else {
+          targetNumber = teamNum;
+          logDestName = `Equipe Interna (${teamNum})`;
+        }
+      }
+
+      if (isEvolutionConfigured()) {
+        try {
+          await sendTextMessage(targetNumber, text);
+        } catch (err: any) {
+          apiSuccess = false;
+          apiErrorMsg = err.message || err;
+          console.error("Erro no disparo manual do WhatsApp:", err);
+        }
+      }
+
+      if (apiSuccess) {
+        updateParcela(parcela.id, { enviadoWhatsAppCount: parcela.enviadoWhatsAppCount + 1, ultimoEnvio: nowTime });
+        logParcelaHistorico(parcela.id, student.id, 'Cobrança enviada', `Manual WhatsApp para ${logDestName}`);
+
+        const newMsg: WhatsAppMensagem = {
+          id: `msg-${Date.now()}`,
+          alunoId: student.id,
+          tipo: 'SISTEMA',
+          texto: text,
+          dataHora: nowIso(),
+          statusEnvio: 'ENTREGUE'
+        };
+        setMensagens(prev => [...prev, newMsg]);
+
+        const newLog: LogAtividade = {
+          id: `log-${Date.now()}`,
+          timestamp: logTimestamp(),
+          tipo: 'WHATSAPP',
+          usuario: 'Atendente Humano',
+          detalhe: `Cobrança via WhatsApp enviada para ${logDestName}.`,
+          sucesso: true
+        };
+        setLogs(prev => [newLog, ...prev]);
+
+        postToastAlert(`Cobrança WhatsApp enviada para ${logDestName}.`, 'success');
+      } else {
+        const newLog: LogAtividade = {
+          id: `log-${Date.now()}`,
+          timestamp: logTimestamp(),
+          tipo: 'WHATSAPP',
+          usuario: 'Atendente Humano',
+          detalhe: `Falha ao enviar cobrança via WhatsApp para ${logDestName}. Erro: ${apiErrorMsg}`,
+          sucesso: false
+        };
+        setLogs(prev => [newLog, ...prev]);
+        postToastAlert(`Falha ao disparar WhatsApp para ${logDestName}: ${apiErrorMsg}`, 'error');
+      }
+    } else {
+      // E-mail Channel
+      let targetEmail = student.email;
+      let logDestName = student.nome;
+
+      if (destinatario === 'EQUIPE_INTERNA') {
+        const teamEmail = smtpConfig?.fromEmail || '';
+        if (teamEmail) {
+          targetEmail = teamEmail;
+          logDestName = `Equipe Interna (${teamEmail})`;
+        } else {
+          postToastAlert('E-mail do remetente SMTP não configurado! Disparando para o aluno.', 'warning');
+        }
+      }
+
+      try {
+        const res = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: targetEmail,
+            subject: subject || 'Aviso de Cobrança',
+            body: `<div style="font-family: sans-serif; line-height: 1.6; color: #333;">${text.replace(/\n/g, '<br />')}</div>`
+          })
+        });
+
+        const result = await res.json();
+        if (res.ok && result.messageId) {
+          updateParcela(parcela.id, { enviadoWhatsAppCount: parcela.enviadoWhatsAppCount + 1, ultimoEnvio: nowTime });
+          logParcelaHistorico(parcela.id, student.id, 'Cobrança enviada', `Manual E-mail para ${logDestName}`);
+
+          const newLog: LogAtividade = {
+            id: `log-${Date.now()}`,
+            timestamp: logTimestamp(),
+            tipo: 'USUARIO',
+            usuario: 'Atendente Humano',
+            detalhe: `E-mail de cobrança enviado para ${logDestName} (${targetEmail}). Subject: ${subject}`,
+            sucesso: true
+          };
+          setLogs(prev => [newLog, ...prev]);
+          postToastAlert(`E-mail de cobrança enviado com sucesso para ${logDestName}!`, 'success');
+        } else {
+          throw new Error(result.error || result.message || 'Erro no envio');
+        }
+      } catch (err: any) {
+        const newLog: LogAtividade = {
+          id: `log-${Date.now()}`,
+          timestamp: logTimestamp(),
+          tipo: 'USUARIO',
+          usuario: 'Atendente Humano',
+          detalhe: `Falha ao enviar e-mail de cobrança para ${logDestName}. Erro: ${err.message || err}`,
+          sucesso: false
+        };
+        setLogs(prev => [newLog, ...prev]);
+        postToastAlert(`Falha ao disparar e-mail de cobrança: ${err.message || err}`, 'error');
+      }
     }
   };
 
@@ -944,7 +1122,7 @@ export default function App() {
               onEditValor={handleEditValor}
               onCancel={handleCancelParcela}
               onExempt={handleExemptParcela}
-              onResendCharge={handleTriggerSingleParcelaWhatsApp}
+              onResendCharge={handleOpenConfirmarModal}
               onTriggerAllOverdue={handleTriggerAllOverdueWhatsApp}
               onSendToHuman={handleSendParcelaToHuman}
             />
@@ -999,6 +1177,10 @@ export default function App() {
               alunos={alunos}
               users={users}
               onUpdateUsers={setUsers}
+              smtpConfig={smtpConfig}
+              onUpdateSmtpConfig={setSmtpConfig}
+              globalSettings={globalSettings}
+              onUpdateGlobalSettings={setGlobalSettings}
             />
           </div>
         );
@@ -1072,6 +1254,18 @@ export default function App() {
             <X className="h-4 w-4" />
           </button>
         </div>
+      )}
+
+      {isConfirmarModalOpen && (
+        <ConfirmarEnvioModal
+          isOpen={isConfirmarModalOpen}
+          onClose={() => setIsConfirmarModalOpen(false)}
+          aluno={confirmarModalAluno}
+          parcela={confirmarModalParcela}
+          regras={regras}
+          smtpConfig={smtpConfig}
+          onConfirm={handleSendCustomCobranca}
+        />
       )}
     </div>
   );

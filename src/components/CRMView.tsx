@@ -32,7 +32,11 @@ export default function CRMView({ crmConfig, alunos, onUpdateCrmConfig, onPostAl
     sincronizacaoAtiva: false,
     logSincronizacao: [],
     pipelines: [],
-    tagMap: {}
+    tagMap: {
+      pago: '',
+      pendente: '',
+      inadimplente: ''
+    }
   };
   const safeAlunos = alunos || [];
 

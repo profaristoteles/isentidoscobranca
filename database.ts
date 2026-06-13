@@ -34,6 +34,8 @@ export interface DbData {
   polos: string[];
   cursos: string[];
   users: any[];
+  smtpConfig?: any;
+  globalSettings?: any;
 }
 
 export function getInitialData(): DbData {
@@ -47,7 +49,20 @@ export function getInitialData(): DbData {
     logs: INITIAL_LOGS_ATIVIDADE,
     polos: INITIAL_POLOS,
     cursos: INITIAL_CURSOS,
-    users: INITIAL_USERS
+    users: INITIAL_USERS,
+    smtpConfig: {
+      host: 'smtp.zeptomail.com',
+      port: 587,
+      user: 'emailapikey',
+      pass: '',
+      fromEmail: '',
+      fromName: 'Instituto Sentidos',
+      secure: false,
+      active: false
+    },
+    globalSettings: {
+      teamPhoneNumber: ''
+    }
   };
 }
 
@@ -167,6 +182,25 @@ function readDBJson(): DbData {
     }
     if (!parsed.users) {
       parsed.users = INITIAL_USERS;
+      updated = true;
+    }
+    if (!parsed.smtpConfig) {
+      parsed.smtpConfig = {
+        host: 'smtp.zeptomail.com',
+        port: 587,
+        user: 'emailapikey',
+        pass: '',
+        fromEmail: '',
+        fromName: 'Instituto Sentidos',
+        secure: false,
+        active: false
+      };
+      updated = true;
+    }
+    if (!parsed.globalSettings) {
+      parsed.globalSettings = {
+        teamPhoneNumber: ''
+      };
       updated = true;
     }
     if (!parsed.parcelaHistorico) {
@@ -327,8 +361,13 @@ export async function initDb(): Promise<void> {
         "tipoGatilho" VARCHAR(50) NOT NULL,
         "mensagemTemplate" TEXT NOT NULL,
         ativo BOOLEAN DEFAULT TRUE,
-        "horarioEnvio" VARCHAR(10) NOT NULL
+        "horarioEnvio" VARCHAR(10) NOT NULL,
+        canal VARCHAR(50) DEFAULT 'WHATSAPP',
+        destinatario VARCHAR(50) DEFAULT 'ALUNO'
       );
+
+      ALTER TABLE regras ADD COLUMN IF NOT EXISTS canal VARCHAR(50) DEFAULT 'WHATSAPP';
+      ALTER TABLE regras ADD COLUMN IF NOT EXISTS destinatario VARCHAR(50) DEFAULT 'ALUNO';
 
       CREATE TABLE IF NOT EXISTS crm_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -340,16 +379,30 @@ export async function initDb(): Promise<void> {
         "tagMap" JSONB DEFAULT '{}'::jsonb
       );
 
-      CREATE TABLE IF NOT EXISTS logs (
-        id VARCHAR(100) PRIMARY KEY,
-        timestamp VARCHAR(50) NOT NULL,
-        tipo VARCHAR(50) NOT NULL,
-        usuario VARCHAR(255),
-        detalhe TEXT NOT NULL,
-        sucesso BOOLEAN NOT NULL
+      CREATE TABLE IF NOT EXISTS smtp_config (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        host VARCHAR(255) DEFAULT 'smtp.zeptomail.com',
+        port INTEGER DEFAULT 587,
+        username VARCHAR(255) DEFAULT 'emailapikey',
+        password TEXT DEFAULT '',
+        "fromEmail" VARCHAR(255) DEFAULT '',
+        "fromName" VARCHAR(255) DEFAULT 'Instituto Sentidos',
+        secure BOOLEAN DEFAULT FALSE,
+        active BOOLEAN DEFAULT FALSE
+      );
+
+      CREATE TABLE IF NOT EXISTS global_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        "teamPhoneNumber" VARCHAR(100) DEFAULT ''
       );
 
       -- Garante a existência do registro padrão id=1
+      INSERT INTO smtp_config (id)
+      SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM smtp_config WHERE id = 1);
+
+      INSERT INTO global_settings (id)
+      SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM global_settings WHERE id = 1);
+
       INSERT INTO crm_config (id)
       SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM crm_config WHERE id = 1);
     `);
@@ -406,7 +459,9 @@ export async function readDB(): Promise<DbData> {
       logsRes,
       polosRes,
       cursosRes,
-      usersRes
+      usersRes,
+      smtpRes,
+      globalRes
     ] = await Promise.all([
       pool.query('SELECT * FROM alunos ORDER BY nome ASC'),
       pool.query('SELECT * FROM parcelas ORDER BY vencimento DESC'),
@@ -417,10 +472,14 @@ export async function readDB(): Promise<DbData> {
       pool.query('SELECT * FROM logs ORDER BY timestamp DESC'),
       pool.query('SELECT * FROM polos ORDER BY nome ASC'),
       pool.query('SELECT * FROM cursos ORDER BY nome ASC'),
-      pool.query('SELECT * FROM users ORDER BY name ASC')
+      pool.query('SELECT * FROM users ORDER BY name ASC'),
+      pool.query('SELECT * FROM smtp_config WHERE id = 1'),
+      pool.query('SELECT * FROM global_settings WHERE id = 1')
     ]);
 
     const crm = crmRes.rows[0] || {};
+    const smtp = smtpRes.rows[0] || {};
+    const globalS = globalRes.rows[0] || {};
 
     return {
       alunos: alunosRes.rows.map(a => ({
@@ -435,7 +494,11 @@ export async function readDB(): Promise<DbData> {
       })),
       parcelaHistorico: historicoRes.rows,
       mensagens: mensagensRes.rows,
-      regras: regrasRes.rows,
+      regras: regrasRes.rows.map(r => ({
+        ...r,
+        canal: r.canal || 'WHATSAPP',
+        destinatario: r.destinatario || 'ALUNO'
+      })),
       crmConfig: {
         apiKey: crm.apiKey || '',
         urlWebhook: crm.urlWebhook || '',
@@ -447,7 +510,20 @@ export async function readDB(): Promise<DbData> {
       logs: logsRes.rows,
       polos: polosRes.rows.map(p => p.nome),
       cursos: cursosRes.rows.map(c => c.nome),
-      users: usersRes.rows
+      users: usersRes.rows,
+      smtpConfig: {
+        host: smtp.host || 'smtp.zeptomail.com',
+        port: smtp.port || 587,
+        user: smtp.username || 'emailapikey',
+        pass: smtp.password || '',
+        fromEmail: smtp.fromEmail || '',
+        fromName: smtp.fromName || 'Instituto Sentidos',
+        secure: smtp.secure ?? false,
+        active: smtp.active ?? false
+      },
+      globalSettings: {
+        teamPhoneNumber: globalS.teamPhoneNumber || ''
+      }
     };
   } catch (error) {
     console.error('[Database] Erro ao ler do PostgreSQL:', error);
@@ -466,7 +542,7 @@ export async function writeDB(data: DbData): Promise<void> {
   try {
     await client.query('BEGIN');
 
-    await client.query('TRUNCATE TABLE polos, cursos, users, alunos, parcelas, parcela_historico, mensagens, regras, crm_config, logs RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE TABLE polos, cursos, users, alunos, parcelas, parcela_historico, mensagens, regras, crm_config, logs, smtp_config, global_settings RESTART IDENTITY CASCADE');
 
     if (Array.isArray(data.polos)) {
       for (const polo of data.polos) {
@@ -550,11 +626,11 @@ export async function writeDB(data: DbData): Promise<void> {
     if (Array.isArray(data.regras)) {
       for (const r of data.regras) {
         await client.query(
-          `INSERT INTO regras (id, titulo, descricao, "diasGatilho", "tipoGatilho", "mensagemTemplate", ativo, "horarioEnvio")
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          `INSERT INTO regras (id, titulo, descricao, "diasGatilho", "tipoGatilho", "mensagemTemplate", ativo, "horarioEnvio", canal, destinatario)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             r.id, r.titulo, r.descricao, r.diasGatilho, r.tipoGatilho, r.mensagemTemplate,
-            r.ativo ?? true, r.horarioEnvio
+            r.ativo ?? true, r.horarioEnvio, r.canal || 'WHATSAPP', r.destinatario || 'ALUNO'
           ]
         );
       }
@@ -584,6 +660,23 @@ export async function writeDB(data: DbData): Promise<void> {
           [l.id, l.timestamp, l.tipo, l.usuario, l.detalhe, l.sucesso ?? true]
         );
       }
+    }
+
+    if (data.smtpConfig) {
+      const s = data.smtpConfig;
+      await client.query(
+        `INSERT INTO smtp_config (id, host, port, username, password, "fromEmail", "fromName", secure, active)
+         VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)`,
+        [s.host, s.port, s.user, s.pass, s.fromEmail, s.fromName, s.secure ?? false, s.active ?? false]
+      );
+    }
+
+    if (data.globalSettings) {
+      const g = data.globalSettings;
+      await client.query(
+        `INSERT INTO global_settings (id, "teamPhoneNumber") VALUES (1, $1)`,
+        [g.teamPhoneNumber]
+      );
     }
 
     await client.query('COMMIT');

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   HelpCircle,
   Mail,
+  Send,
   UserPlus,
   Key,
   AlertTriangle,
@@ -23,7 +24,7 @@ import {
   Globe,
   GraduationCap
 } from 'lucide-react';
-import { Aluno, Colaborador } from '../types';
+import { Aluno, Colaborador, SmtpConfig, GlobalSettings } from '../types';
 import { checkConnectionStatus } from '../services/whatsappService';
 import { safeGetItem, safeSetItem } from '../utils/storage';
 
@@ -39,6 +40,10 @@ interface ConfiguracoesViewProps {
   alunos: Aluno[];
   users: Colaborador[];
   onUpdateUsers: (newUsers: Colaborador[]) => void;
+  smtpConfig: SmtpConfig;
+  onUpdateSmtpConfig: (config: SmtpConfig) => void;
+  globalSettings: GlobalSettings;
+  onUpdateGlobalSettings: (settings: GlobalSettings) => void;
 }
 
 interface MockUser {
@@ -59,7 +64,11 @@ export default function ConfiguracoesView({
   onUpdateCursos,
   alunos,
   users,
-  onUpdateUsers
+  onUpdateUsers,
+  smtpConfig,
+  onUpdateSmtpConfig,
+  globalSettings,
+  onUpdateGlobalSettings
 }: ConfiguracoesViewProps) {
   
   // Registration form state
@@ -75,13 +84,106 @@ export default function ConfiguracoesView({
 
   const [lgpdConsent, setLgpdConsent] = useState(true);
   const [lgpdAnonCpf, setLgpdAnonCpf] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'CURSOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS'>(() => {
+  const [activeSubTab, setActiveSubTab] = useState<'USERS' | 'POLOS' | 'CURSOS' | 'LGPD' | 'APPEARANCE' | 'RESTORE' | 'APIS' | 'NOTIFICACOES'>(() => {
     return (safeGetItem('sentidos_active_subtab') as any) || 'USERS';
   });
   
   useEffect(() => {
     safeSetItem('sentidos_active_subtab', activeSubTab);
   }, [activeSubTab]);
+
+  // SMTP and Notification settings states
+  const [smtpHost, setSmtpHost] = useState(smtpConfig?.host || 'smtp.zeptomail.com');
+  const [smtpPort, setSmtpPort] = useState(smtpConfig?.port || 587);
+  const [smtpUser, setSmtpUser] = useState(smtpConfig?.user || 'emailapikey');
+  const [smtpPass, setSmtpPass] = useState(smtpConfig?.pass || '');
+  const [smtpFromEmail, setSmtpFromEmail] = useState(smtpConfig?.fromEmail || '');
+  const [smtpFromName, setSmtpFromName] = useState(smtpConfig?.fromName || 'Instituto Sentidos');
+  const [smtpSecure, setSmtpSecure] = useState(smtpConfig?.secure || false);
+  const [smtpActive, setSmtpActive] = useState(smtpConfig?.active || false);
+
+  const [teamPhone, setTeamPhone] = useState(globalSettings?.teamPhoneNumber || '');
+
+  const [testEmail, setTestEmail] = useState('');
+  const [sendingTest, setSendingTest] = useState(false);
+
+  // Sync props to local states
+  useEffect(() => {
+    if (smtpConfig) {
+      setSmtpHost(smtpConfig.host);
+      setSmtpPort(smtpConfig.port);
+      setSmtpUser(smtpConfig.user);
+      setSmtpPass(smtpConfig.pass);
+      setSmtpFromEmail(smtpConfig.fromEmail);
+      setSmtpFromName(smtpConfig.fromName);
+      setSmtpSecure(smtpConfig.secure);
+      setSmtpActive(smtpConfig.active);
+    }
+  }, [smtpConfig]);
+
+  useEffect(() => {
+    if (globalSettings) {
+      setTeamPhone(globalSettings.teamPhoneNumber);
+    }
+  }, [globalSettings]);
+
+  const handleTestSmtp = async () => {
+    const trimmedEmail = testEmail.trim();
+    if (!trimmedEmail) {
+      onPostAlert('Informe um e-mail de destino para o teste.', 'warning');
+      return;
+    }
+
+    setSendingTest(true);
+    try {
+      const config = {
+        host: smtpHost,
+        port: Number(smtpPort),
+        user: smtpUser,
+        pass: smtpPass,
+        fromEmail: smtpFromEmail,
+        fromName: smtpFromName,
+        secure: smtpSecure,
+        active: smtpActive
+      };
+
+      const res = await fetch('/api/send-test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ smtpConfig: config, testEmail: trimmedEmail })
+      });
+
+      const result = await res.json();
+      if (res.ok && result.success) {
+        onPostAlert(result.message, 'success');
+      } else {
+        onPostAlert(`Erro ao enviar teste SMTP: ${result.error || result.message}`, 'error');
+      }
+    } catch (err: any) {
+      onPostAlert(`Erro na requisição de teste: ${err.message || err}`, 'error');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const handleSaveNotificacoes = () => {
+    onUpdateSmtpConfig({
+      host: smtpHost,
+      port: Number(smtpPort),
+      user: smtpUser,
+      pass: smtpPass,
+      fromEmail: smtpFromEmail,
+      fromName: smtpFromName,
+      secure: smtpSecure,
+      active: smtpActive
+    });
+
+    onUpdateGlobalSettings({
+      teamPhoneNumber: teamPhone
+    });
+
+    onPostAlert('Configurações de Notificações, SMTP e WhatsApp da Equipe salvas com sucesso!', 'success');
+  };
   
   const [activeProvider, setActiveProvider] = useState(() => {
     return safeGetItem('sentidos_active_provider') || 'gemini';
@@ -361,6 +463,16 @@ export default function ConfiguracoesView({
           >
             <Key className="h-4.5 w-4.5" />
             <span>Configurações de APIs</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('NOTIFICACOES')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2.5 transition cursor-pointer ${
+              activeSubTab === 'NOTIFICACOES' ? 'bg-[#03045e] text-white' : 'text-gray-600 hover:bg-slate-50'
+            }`}
+          >
+            <Mail className="h-4.5 w-4.5" />
+            <span>Notificações & SMTP</span>
           </button>
         </div>
 
@@ -1155,6 +1267,189 @@ export default function ConfiguracoesView({
                     <span className="font-bold text-gray-800 block mb-0.5">Modo de Simulação</span>
                     Caso nenhum provedor ativo tenha sua respectiva chave de API configurada, o sistema continuará operando no modo simulador local inteligente de alta fidelidade para testes e validações.
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SubTab 6: Notificações & SMTP */}
+          {activeSubTab === 'NOTIFICACOES' && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-100 pb-3">
+                <h3 className="text-sm font-bold text-gray-900">Configurações de Notificações, SMTP e WhatsApp da Equipe</h3>
+                <p className="text-xs text-gray-400">Configure as credenciais do Zoho Zeptomail e as preferências dos alertas operacionais</p>
+              </div>
+
+              <div className="space-y-6">
+                
+                {/* SMTP Config Card */}
+                <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-5 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-200/50 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4.5 w-4.5 text-indigo-650" />
+                      <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">Integração de E-mail (Zoho Zeptomail)</span>
+                    </div>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={smtpActive}
+                        onChange={(e) => setSmtpActive(e.target.checked)}
+                        className="h-4 w-4 text-indigo-650 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <span>Ativar Envio de E-mails</span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">Servidor SMTP (Host)</label>
+                      <input
+                        type="text"
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        placeholder="smtp.zeptomail.com"
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">Porta SMTP</label>
+                      <input
+                        type="number"
+                        value={smtpPort}
+                        onChange={(e) => setSmtpPort(Number(e.target.value))}
+                        placeholder="587"
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">SSL / TLS Seguro</label>
+                      <div className="h-10 flex items-center">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={smtpSecure}
+                            onChange={(e) => setSmtpSecure(e.target.checked)}
+                            className="h-4.5 w-4.5 text-indigo-650 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <span>Usar SSL/TLS Seguro</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">Nome do Usuário</label>
+                      <input
+                        type="text"
+                        value={smtpUser}
+                        onChange={(e) => setSmtpUser(e.target.value)}
+                        placeholder="emailapikey"
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                      <span className="text-[9px] text-gray-400 mt-1 block leading-tight">
+                        Para o Zoho Zeptomail, use sempre <code>emailapikey</code> como usuário.
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">Senha (Token Zeptomail)</label>
+                      <input
+                        type="password"
+                        value={smtpPass}
+                        onChange={(e) => setSmtpPass(e.target.value)}
+                        placeholder="Insira seu Token Zeptomail"
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                      <span className="text-[9px] text-gray-400 mt-1 block leading-tight">
+                        O token de envio gerado no painel do Zoho Zeptomail.
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">E-mail do Remetente (From)</label>
+                      <input
+                        type="email"
+                        value={smtpFromEmail}
+                        onChange={(e) => setSmtpFromEmail(e.target.value)}
+                        placeholder="financeiro@institutosentidos.com.br"
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">Nome de Exibição do Remetente</label>
+                      <input
+                        type="text"
+                        value={smtpFromName}
+                        onChange={(e) => setSmtpFromName(e.target.value)}
+                        placeholder="Instituto Sentidos"
+                        className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Test SMTP connection section */}
+                  <div className="mt-4 pt-4 border-t border-slate-200/50 bg-indigo-50/20 p-3 rounded-lg flex flex-col sm:flex-row justify-between items-end sm:items-center gap-3">
+                    <div className="text-xs min-w-0 flex-1">
+                      <p className="font-bold text-indigo-900">Validar Configurações SMTP</p>
+                      <p className="text-slate-500 mt-0.5 font-medium">Insira um e-mail de destino e clique em testar para disparar um e-mail de verificação.</p>
+                      <div className="mt-2 max-w-sm">
+                        <input
+                          type="email"
+                          value={testEmail}
+                          onChange={(e) => setTestEmail(e.target.value)}
+                          placeholder="Digite o e-mail de destino do teste"
+                          className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTestSmtp}
+                      disabled={sendingTest}
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold px-4 py-2.2 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5 border border-indigo-200 disabled:opacity-50"
+                    >
+                      {sendingTest ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Enviando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          <span>Testar Envio</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Team Alertas Card */}
+                <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-200/50 pb-2">
+                    <Smartphone className="h-4.5 w-4.5 text-emerald-650" />
+                    <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">Notificação para Equipe Interna</span>
+                  </div>
+
+                  <div className="max-w-md">
+                    <label className="block text-[10px] font-bold text-gray-450 uppercase mb-1">WhatsApp da Equipe Interna</label>
+                    <input
+                      type="text"
+                      value={teamPhone}
+                      onChange={(e) => setTeamPhone(e.target.value)}
+                      placeholder="+55 (86) 99999-9999"
+                      className="w-full bg-white border border-slate-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1.5 block leading-relaxed font-sans">
+                      Número de WhatsApp do setor operacional/financeiro para receber alertas da régua de cobrança configurados para a <strong>Equipe Interna</strong>.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Save All Notificacoes Button */}
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveNotificacoes}
+                    className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-6 py-2.5 rounded-lg text-xs transition cursor-pointer shadow-md"
+                  >
+                    Salvar Configurações
+                  </button>
                 </div>
               </div>
             </div>

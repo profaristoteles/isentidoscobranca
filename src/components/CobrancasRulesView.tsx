@@ -29,6 +29,8 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
   const [tempTemplate, setTempTemplate] = useState('');
   const [tempHorario, setTempHorario] = useState('09:00');
   const [tempDiasGatilho, setTempDiasGatilho] = useState(1);
+  const [tempCanal, setTempCanal] = useState<'WHATSAPP' | 'EMAIL' | 'AMBOS'>('WHATSAPP');
+  const [tempDestinatario, setTempDestinatario] = useState<'ALUNO' | 'EQUIPE_INTERNA'>('ALUNO');
 
   // Template replacements simulator for rendering Live Previews
   const getSimulatedPreviewText = (template: string) => {
@@ -57,6 +59,8 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
     setTempTemplate(rule.mensagemTemplate);
     setTempHorario(rule.horarioEnvio);
     setTempDiasGatilho(rule.diasGatilho);
+    setTempCanal(rule.canal || 'WHATSAPP');
+    setTempDestinatario(rule.destinatario || 'ALUNO');
   };
 
   const cancelEditing = () => {
@@ -70,7 +74,9 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
           ...r, 
           mensagemTemplate: tempTemplate, 
           horarioEnvio: tempHorario,
-          diasGatilho: tempDiasGatilho
+          diasGatilho: tempDiasGatilho,
+          canal: tempCanal,
+          destinatario: tempDestinatario
         };
       }
       return r;
@@ -188,6 +194,34 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
                       </div>
                     </div>
 
+                    {/* Channel & Recipient selection */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">Canal de Envio</label>
+                        <select
+                          value={tempCanal}
+                          onChange={(e) => setTempCanal(e.target.value as any)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded p-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="WHATSAPP">WhatsApp</option>
+                          <option value="EMAIL">E-mail</option>
+                          <option value="AMBOS">Ambos (WhatsApp + E-mail)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">Destinatário do Alerta</label>
+                        <select
+                          value={tempDestinatario}
+                          onChange={(e) => setTempDestinatario(e.target.value as any)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded p-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="ALUNO">Aluno (Estudante)</option>
+                          <option value="EQUIPE_INTERNA">Equipe Interna (Operações)</option>
+                        </select>
+                      </div>
+                    </div>
+
                     {/* Template Field */}
                     <div>
                       <div className="flex justify-between items-center text-[11px] font-bold text-gray-500 uppercase mb-1">
@@ -221,7 +255,7 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
                 ) : (
                   <div className="space-y-4">
                     {/* Visual Configuration specs */}
-                    <div className="flex flex-wrap gap-4 text-xs font-semibold text-gray-600 bg-slate-50/50 p-2.5 rounded-lg">
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-gray-600 bg-slate-50/50 p-2.5 rounded-lg">
                       <span className="flex items-center gap-1.5">
                         <CalendarDays className="h-4 w-4 text-[#ff8000]" />
                         Gatilho: {regra.diasGatilho === 0 ? 'No vencimento' : `${Math.abs(regra.diasGatilho)} dias ${regra.diasGatilho < 0 ? 'antes' : 'depois'}`}
@@ -231,8 +265,12 @@ export default function CobrancasRulesView({ regras, onSaveRegras, onPostAlert }
                         Disparo às: {regra.horarioEnvio}hs
                       </span>
                       <span className="flex items-center gap-1.5 border-l border-gray-200 pl-4">
-                        <MessageSquare className="h-4 w-4 text-orange-400" />
-                        Canal: Automação Evolution API
+                        <MessageSquare className="h-4 w-4 text-emerald-500" />
+                        Canal: {regra.canal === 'WHATSAPP' ? 'WhatsApp' : regra.canal === 'EMAIL' ? 'E-mail' : 'Ambos'}
+                      </span>
+                      <span className="flex items-center gap-1.5 border-l border-gray-200 pl-4">
+                        <Info className="h-4 w-4 text-indigo-500" />
+                        Destinatário: {regra.destinatario === 'EQUIPE_INTERNA' ? 'Equipe Interna' : 'Aluno'}
                       </span>
                     </div>
 

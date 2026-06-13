@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --input-type=module)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: add database.ts to Dockerfile production stage copy *)"
+    ]
+  }
+}

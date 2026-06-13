@@ -2,6 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
 import { readDB, writeDB, initDb, getInitialData, backupDatabaseFile } from './database';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -119,7 +120,7 @@ app.post('/api/save-all', async (req, res) => {
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ success: false, message: 'Dados inválidos' });
   }
-  const required = ['alunos', 'parcelas', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'cursos', 'users'];
+  const required = ['alunos', 'parcelas', 'mensagens', 'regras', 'crmConfig', 'logs', 'polos', 'cursos', 'users', 'smtpConfig', 'globalSettings'];
   const hasRequired = required.every(key => key in data);
   if (!hasRequired) {
     return res.status(400).json({ success: false, message: 'Dados incompletos para persistência' });
@@ -316,6 +317,81 @@ app.post('/api/logs', async (req, res) => {
     res.json({ success: true, data: novoLog });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Send test email endpoint
+app.post('/api/send-test-email', async (req, res) => {
+  const { smtpConfig, testEmail } = req.body;
+  if (!smtpConfig || !testEmail) {
+    return res.status(400).json({ success: false, message: 'Dados incompletos para envio de teste.' });
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: Number(smtpConfig.port),
+      secure: smtpConfig.secure ?? false,
+      auth: {
+        user: smtpConfig.user,
+        pass: smtpConfig.pass
+      }
+    });
+
+    const info = await transporter.sendMail({
+      from: `"${smtpConfig.fromName || 'Instituto Sentidos'}" <${smtpConfig.fromEmail}>`,
+      to: testEmail,
+      subject: 'Teste de Configuração SMTP — Sentidos Cobranças',
+      text: 'Olá! Este é um e-mail de teste enviado pelo sistema de Cobrança Automatizada do Instituto Sentidos / FAEPI. Suas configurações SMTP foram validadas com sucesso!',
+      html: '<p>Olá!</p><p>Este é um e-mail de teste enviado pelo sistema de <strong>Cobrança Automatizada do Instituto Sentidos / FAEPI</strong>.</p><p>Suas configurações SMTP foram validadas com sucesso!</p>'
+    });
+
+    console.log('[SMTP] Test email sent: %s', info.messageId);
+    return res.json({ success: true, message: `E-mail de teste enviado com sucesso! Message ID: ${info.messageId}` });
+  } catch (err: any) {
+    console.error('[SMTP] Test email failed:', err);
+    return res.status(500).json({ success: false, error: err.message || err });
+  }
+});
+
+// Send actual billing email
+app.post('/api/send-email', async (req, res) => {
+  const { to, subject, body } = req.body;
+  if (!to || !subject || !body) {
+    return res.status(400).json({ success: false, message: 'Parâmetros "to", "subject" e "body" são obrigatórios.' });
+  }
+
+  try {
+    const db = await readDB();
+    const smtpConfig = db.smtpConfig;
+
+    if (!smtpConfig || !smtpConfig.active) {
+      return res.status(400).json({ success: false, message: 'Integração de e-mail desativada ou não configurada.' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: Number(smtpConfig.port),
+      secure: smtpConfig.secure ?? false,
+      auth: {
+        user: smtpConfig.user,
+        pass: smtpConfig.pass
+      }
+    });
+
+    const info = await transporter.sendMail({
+      from: `"${smtpConfig.fromName || 'Instituto Sentidos'}" <${smtpConfig.fromEmail}>`,
+      to,
+      subject,
+      text: body.replace(/<[^>]*>/g, ''), // Strip HTML tags for plain text
+      html: body
+    });
+
+    console.log('[SMTP] Billing email sent to %s: %s', to, info.messageId);
+    return res.json({ success: true, messageId: info.messageId });
+  } catch (err: any) {
+    console.error('[SMTP] Billing email failed:', err);
+    return res.status(500).json({ success: false, error: err.message || err });
   }
 });
 
