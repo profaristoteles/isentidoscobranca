@@ -103,6 +103,8 @@ export default function ConfiguracoesView({
   const [smtpActive, setSmtpActive] = useState(smtpConfig?.active || false);
 
   const [teamPhone, setTeamPhone] = useState(globalSettings?.teamPhoneNumber || '');
+  const [dispatchMinInterval, setDispatchMinInterval] = useState(globalSettings?.dispatchMinIntervalSec ?? 15);
+  const [dispatchMaxInterval, setDispatchMaxInterval] = useState(globalSettings?.dispatchMaxIntervalSec ?? 45);
 
   const [testEmail, setTestEmail] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
@@ -124,6 +126,8 @@ export default function ConfiguracoesView({
   useEffect(() => {
     if (globalSettings) {
       setTeamPhone(globalSettings.teamPhoneNumber);
+      setDispatchMinInterval(globalSettings.dispatchMinIntervalSec ?? 15);
+      setDispatchMaxInterval(globalSettings.dispatchMaxIntervalSec ?? 45);
     }
   }, [globalSettings]);
 
@@ -179,10 +183,12 @@ export default function ConfiguracoesView({
     });
 
     onUpdateGlobalSettings({
-      teamPhoneNumber: teamPhone
+      teamPhoneNumber: teamPhone,
+      dispatchMinIntervalSec: Number(dispatchMinInterval),
+      dispatchMaxIntervalSec: Number(dispatchMaxInterval)
     });
 
-    onPostAlert('Configurações de Notificações, SMTP e WhatsApp da Equipe salvas com sucesso!', 'success');
+    onPostAlert('Configurações de Notificações, SMTP, WhatsApp da Equipe e Intervalo Anti-Ban salvas com sucesso!', 'success');
   };
   
   const [activeProvider, setActiveProvider] = useState(() => {
@@ -1438,6 +1444,68 @@ export default function ConfiguracoesView({
                     <span className="text-[10px] text-gray-400 mt-1.5 block leading-relaxed font-sans">
                       Número de WhatsApp do setor operacional/financeiro para receber alertas da régua de cobrança configurados para a <strong>Equipe Interna</strong>.
                     </span>
+                  </div>
+                </div>
+
+                {/* Anti-Ban Dispatch Interval Card */}
+                <div className="bg-amber-50/40 border border-amber-200/60 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-amber-200/50 pb-2">
+                    <Clock className="h-4.5 w-4.5 text-amber-600" />
+                    <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">Intervalo Anti-Ban de Disparos WhatsApp</span>
+                  </div>
+
+                  <p className="text-xs text-gray-500 leading-relaxed font-medium">
+                    Para evitar banimento da conta pelo Meta, o sistema aguarda um tempo aleatório entre cada mensagem enviada no disparo em lote.
+                    Configure o intervalo mínimo e máximo (em segundos) para equilibrar velocidade e segurança.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Intervalo Mínimo (segundos)</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={300}
+                        value={dispatchMinInterval}
+                        onChange={(e) => {
+                          const val = Math.max(5, Number(e.target.value));
+                          setDispatchMinInterval(val);
+                          if (val > dispatchMaxInterval) setDispatchMaxInterval(val + 5);
+                        }}
+                        className="w-full bg-white border border-amber-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-amber-500 focus:outline-hidden font-mono"
+                      />
+                      <span className="text-[9px] text-gray-400 mt-1 block">
+                        Tempo mínimo de espera entre cada mensagem. Recomendado: 15s ou mais.
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Intervalo Máximo (segundos)</label>
+                      <input
+                        type="number"
+                        min={10}
+                        max={600}
+                        value={dispatchMaxInterval}
+                        onChange={(e) => {
+                          const val = Math.max(Number(dispatchMinInterval) + 5, Number(e.target.value));
+                          setDispatchMaxInterval(val);
+                        }}
+                        className="w-full bg-white border border-amber-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-amber-500 focus:outline-hidden font-mono"
+                      />
+                      <span className="text-[9px] text-gray-400 mt-1 block">
+                        Tempo máximo de espera entre cada mensagem. Recomendado: 45s ou mais.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2.5 items-start text-xs">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-800">Intervalo atual:</p>
+                      <p className="text-amber-700 mt-0.5 font-medium">
+                        Cada mensagem será enviada com um delay aleatório entre <strong>{dispatchMinInterval}s</strong> e <strong>{dispatchMaxInterval}s</strong>.
+                        Para um lote de 50 alunos, o disparo poderá levar entre <strong>{Math.round(dispatchMinInterval * 50 / 60)} min</strong> e <strong>{Math.round(dispatchMaxInterval * 50 / 60)} min</strong>.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

@@ -131,5 +131,7 @@ export interface SmtpConfig {
 
 export interface GlobalSettings {
   teamPhoneNumber: string;
+  dispatchMinIntervalSec: number; // min seconds between bulk dispatches (anti-ban)
+  dispatchMaxIntervalSec: number; // max seconds between bulk dispatches (anti-ban)
 }
 

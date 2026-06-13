@@ -138,7 +138,9 @@ export default function App() {
 
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(() => {
     return safeParseJson(safeGetItem('sentidos_globalSettings'), {
-      teamPhoneNumber: ''
+      teamPhoneNumber: '',
+      dispatchMinIntervalSec: 15,
+      dispatchMaxIntervalSec: 45
     });
   });
 
@@ -551,8 +553,8 @@ export default function App() {
     }
   };
 
-  // Operation: charge all overdue parcelas at once
-  const handleTriggerAllOverdueWhatsApp = () => {
+  // Operation: charge all overdue parcelas at once — with anti-ban random interval between dispatches
+  const handleTriggerAllOverdueWhatsApp = async () => {
     if (!whatsappOnline) {
       postToastAlert('Disparo massivo recusado. Evolution API desconectada.', 'error');
       return;
@@ -569,8 +571,20 @@ export default function App() {
       return;
     }
 
-    overdue.forEach(p => handleTriggerSingleParcelaWhatsApp(p));
-    postToastAlert(`Lote de cobrança disparado! Notificadas ${overdue.length} parcelas em atraso.`, 'success');
+    const minMs = (globalSettings?.dispatchMinIntervalSec ?? 15) * 1000;
+    const maxMs = (globalSettings?.dispatchMaxIntervalSec ?? 45) * 1000;
+
+    postToastAlert(`Iniciando disparo de ${overdue.length} cobranças com intervalo anti-ban entre ${globalSettings?.dispatchMinIntervalSec ?? 15}s–${globalSettings?.dispatchMaxIntervalSec ?? 45}s...`, 'success');
+
+    for (let i = 0; i < overdue.length; i++) {
+      await handleTriggerSingleParcelaWhatsApp(overdue[i]);
+      if (i < overdue.length - 1) {
+        const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    postToastAlert(`Lote de cobrança concluído! ${overdue.length} parcelas notificadas com intervalo anti-ban.`, 'success');
   };
 
   // Operation: route a parcela to human attendance
@@ -723,9 +737,21 @@ export default function App() {
     setCurrentTab('alunos');
   };
 
-  // Fast WhatsApp from student list
+  // Fast WhatsApp from student list — always picks the oldest overdue installment first, then oldest pending
   const handleFastWhatsAppNotification = (student: Aluno) => {
-    const outstanding = parcelas.find(p => p.alunoId === student.id && (p.status === 'PENDENTE' || p.status === 'ATRASADO'));
+    const studentParcelas = parcelas.filter(p => p.alunoId === student.id);
+
+    // Priority 1: oldest ATRASADO (overdue) installment
+    const atrasadas = studentParcelas
+      .filter(p => p.status === 'ATRASADO')
+      .sort((a, b) => a.numeroParcela - b.numeroParcela);
+
+    // Priority 2: oldest PENDENTE installment (if no overdue)
+    const pendentes = studentParcelas
+      .filter(p => p.status === 'PENDENTE')
+      .sort((a, b) => a.numeroParcela - b.numeroParcela);
+
+    const outstanding = atrasadas[0] || pendentes[0];
     if (outstanding) {
       handleOpenConfirmarModal(outstanding);
     } else {
