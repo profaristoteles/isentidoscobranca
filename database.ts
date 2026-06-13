@@ -531,6 +531,10 @@ export async function readDB(): Promise<DbData> {
   }
 }
 
+// Helper to sanitize query parameter arrays, replacing undefined values with null
+// to avoid node-postgres throwing errors when executing PostgreSQL queries.
+const cleanParams = (arr: any[]): any[] => arr.map(v => v === undefined ? null : v);
+
 // Write/Sync database
 export async function writeDB(data: DbData): Promise<void> {
   if (!usePg || !pool) {
@@ -560,7 +564,7 @@ export async function writeDB(data: DbData): Promise<void> {
       for (const u of data.users) {
         await client.query(
           'INSERT INTO users (id, name, email, password, role, active) VALUES ($1, $2, $3, $4, $5, $6)',
-          [u.id, u.name, u.email, u.password, u.role, u.active ?? true]
+          cleanParams([u.id, u.name, u.email, u.password, u.role, u.active ?? true])
         );
       }
     }
@@ -575,13 +579,13 @@ export async function writeDB(data: DbData): Promise<void> {
             "totalParcelas", "parcelasPagas", "primeiroVencimentoEmAberto",
             "diaVencimento", "dataMatriculaFinanceira", observacoes
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
-          [
+          cleanParams([
             a.id, a.nome, a.cpf, a.matricula, a.curso, a.polo, a.whatsapp, a.email,
             a.statusFinanceiro, a.valorPendente, a.avatarUrl, a.cadastroData,
             a.modalidade, a.cobrancaAutomatica ?? true, a.turma, a.valorMensalidade,
             a.totalParcelas, a.parcelasPagas, a.primeiroVencimentoEmAberto,
             a.diaVencimento, a.dataMatriculaFinanceira, a.observacoes
-          ]
+          ])
         );
       }
     }
@@ -594,11 +598,11 @@ export async function writeDB(data: DbData): Promise<void> {
             competencia, vencimento, "valorOriginal", "valorAtual", status, origem,
             "dataPagamento", observacoes, "enviadoWhatsAppCount", "ultimoEnvio", "criadoEm", "atualizadoEm"
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
-          [
+          cleanParams([
             p.id, p.alunoId, p.alunoNome, p.curso, p.turma, p.polo, p.numeroParcela, p.totalParcelas,
             p.competencia, p.vencimento, p.valorOriginal, p.valorAtual, p.status, p.origem,
             p.dataPagamento, p.observacoes, p.enviadoWhatsAppCount || 0, p.ultimoEnvio, p.criadoEm, p.atualizadoEm
-          ]
+          ])
         );
       }
     }
@@ -608,7 +612,7 @@ export async function writeDB(data: DbData): Promise<void> {
         await client.query(
           `INSERT INTO parcela_historico (id, "parcelaId", "alunoId", data, acao, observacao, usuario)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [h.id, h.parcelaId, h.alunoId, h.data, h.acao, h.observacao, h.usuario]
+          cleanParams([h.id, h.parcelaId, h.alunoId, h.data, h.acao, h.observacao, h.usuario])
         );
       }
     }
@@ -618,7 +622,7 @@ export async function writeDB(data: DbData): Promise<void> {
         await client.query(
           `INSERT INTO mensagens (id, "alunoId", tipo, texto, "dataHora", "statusEnvio")
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [m.id, m.alunoId, m.tipo, m.texto, m.dataHora, m.statusEnvio]
+          cleanParams([m.id, m.alunoId, m.tipo, m.texto, m.dataHora, m.statusEnvio])
         );
       }
     }
@@ -628,10 +632,10 @@ export async function writeDB(data: DbData): Promise<void> {
         await client.query(
           `INSERT INTO regras (id, titulo, descricao, "diasGatilho", "tipoGatilho", "mensagemTemplate", ativo, "horarioEnvio", canal, destinatario)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
+          cleanParams([
             r.id, r.titulo, r.descricao, r.diasGatilho, r.tipoGatilho, r.mensagemTemplate,
             r.ativo ?? true, r.horarioEnvio, r.canal || 'WHATSAPP', r.destinatario || 'ALUNO'
-          ]
+          ])
         );
       }
     }
@@ -643,12 +647,12 @@ export async function writeDB(data: DbData): Promise<void> {
           id, "apiKey", "urlWebhook", "sincronizacaoAtiva",
           "logSincronizacao", pipelines, "tagMap"
         ) VALUES (1, $1, $2, $3, $4, $5, $6)`,
-        [
+        cleanParams([
           c.apiKey, c.urlWebhook, c.sincronizacaoAtiva ?? true,
           JSON.stringify(c.logSincronizacao || []),
           JSON.stringify(c.pipelines || []),
           JSON.stringify(c.tagMap || {})
-        ]
+        ])
       );
     }
 
@@ -657,7 +661,7 @@ export async function writeDB(data: DbData): Promise<void> {
         await client.query(
           `INSERT INTO logs (id, timestamp, tipo, usuario, detalhe, sucesso)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [l.id, l.timestamp, l.tipo, l.usuario, l.detalhe, l.sucesso ?? true]
+          cleanParams([l.id, l.timestamp, l.tipo, l.usuario, l.detalhe, l.sucesso ?? true])
         );
       }
     }
@@ -667,7 +671,7 @@ export async function writeDB(data: DbData): Promise<void> {
       await client.query(
         `INSERT INTO smtp_config (id, host, port, username, password, "fromEmail", "fromName", secure, active)
          VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)`,
-        [s.host, s.port, s.user, s.pass, s.fromEmail, s.fromName, s.secure ?? false, s.active ?? false]
+        cleanParams([s.host, s.port, s.user, s.pass, s.fromEmail, s.fromName, s.secure ?? false, s.active ?? false])
       );
     }
 
@@ -675,7 +679,7 @@ export async function writeDB(data: DbData): Promise<void> {
       const g = data.globalSettings;
       await client.query(
         `INSERT INTO global_settings (id, "teamPhoneNumber") VALUES (1, $1)`,
-        [g.teamPhoneNumber]
+        cleanParams([g.teamPhoneNumber])
       );
     }
 
@@ -688,3 +692,4 @@ export async function writeDB(data: DbData): Promise<void> {
     client.release();
   }
 }
+
