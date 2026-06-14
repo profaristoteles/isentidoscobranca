@@ -1077,33 +1077,77 @@ export default function App() {
   };
 
   const handleUpdateAluno = (alunoId: string, updatedFields: Partial<Aluno>) => {
-    setAlunos(prev => prev.map(a => a.id === alunoId ? { ...a, ...updatedFields } : a));
+    const currentAluno = alunos.find(a => a.id === alunoId);
+    if (!currentAluno) return;
 
-    // Propagate changes to student's parcelas (name, course, polo, turma)
-    setParcelas(prev => prev.map(p => {
-      if (p.alunoId === alunoId) {
+    const updatedAluno: Aluno = { ...currentAluno, ...updatedFields };
+    setAlunos(prev => prev.map(a => a.id === alunoId ? updatedAluno : a));
+
+    // Detect if matrícula financeira fields changed (triggers parcela regeneration)
+    const financialFields: (keyof Aluno)[] = [
+      'parcelasPagas', 'totalParcelas', 'valorMensalidade',
+      'primeiroVencimentoEmAberto', 'diaVencimento'
+    ];
+    const financialChanged = financialFields.some(
+      f => f in updatedFields && updatedFields[f] !== currentAluno[f]
+    );
+
+    // Statuses that represent real settled transactions — never auto-removed
+    const FINAL_STATUSES = ['PAGO', 'ISENTO', 'CANCELADO', 'NEGOCIADO'];
+
+    let novasParcelas: Parcela[] = [];
+
+    setParcelas(prev => {
+      // Propagate name/course/polo/turma changes to existing parcelas
+      const propagated = prev.map(p => {
+        if (p.alunoId !== alunoId) return p;
         return {
           ...p,
-          alunoNome: updatedFields.nome !== undefined ? updatedFields.nome : p.alunoNome,
-          curso: updatedFields.curso !== undefined ? updatedFields.curso : p.curso,
-          polo: updatedFields.polo !== undefined ? updatedFields.polo : p.polo,
-          turma: updatedFields.turma !== undefined ? updatedFields.turma : p.turma
+          alunoNome: updatedFields.nome ?? p.alunoNome,
+          curso: updatedFields.curso ?? p.curso,
+          polo: updatedFields.polo ?? p.polo,
+          turma: updatedFields.turma ?? p.turma
         };
-      }
-      return p;
-    }));
+      });
 
-    const targetStudent = alunos.find(a => a.id === alunoId);
+      if (!financialChanged) return propagated;
+
+      // Remove open MATRICULA parcelas (PENDENTE/ATRASADO) so they can be regenerated
+      const kept = propagated.filter(
+        p => p.alunoId !== alunoId || p.origem !== 'MATRICULA' || FINAL_STATUSES.includes(p.status)
+      );
+
+      novasParcelas = generateParcelas(updatedAluno, kept, 'MATRICULA');
+      return novasParcelas.length > 0 ? [...novasParcelas, ...kept] : kept;
+    });
+
+    if (financialChanged && novasParcelas.length > 0) {
+      setParcelaHistorico(prev => [
+        ...novasParcelas.map(p =>
+          novoHistorico(
+            p.id, p.alunoId,
+            'Parcela recriada',
+            `Parcela ${formatParcela(p)} recriada por edição da matrícula financeira`,
+            userEmail || undefined
+          )
+        ),
+        ...prev
+      ]);
+    }
+
     const newLog: LogAtividade = {
       id: `log-${Date.now()}`,
       timestamp: logTimestamp(),
       tipo: 'USUARIO',
       usuario: 'adm.financeiro',
-      detalhe: `Cadastro do estudante ${updatedFields.nome || targetStudent?.nome} (Matrícula: ${updatedFields.matricula || targetStudent?.matricula}) atualizado.`,
+      detalhe: `Cadastro do estudante ${updatedAluno.nome} (Matrícula: ${updatedAluno.matricula}) atualizado.${financialChanged ? ` ${novasParcelas.length} parcelas regeneradas.` : ''}`,
       sucesso: true
     };
     setLogs(prev => [newLog, ...prev]);
-    postToastAlert(`Estudante ${updatedFields.nome || targetStudent?.nome} atualizado com sucesso!`, 'success');
+    postToastAlert(
+      `Estudante ${updatedAluno.nome} atualizado!${financialChanged ? ` ${novasParcelas.length} parcelas regeneradas.` : ''}`,
+      'success'
+    );
   };
 
   // Core Conditional router rendering
