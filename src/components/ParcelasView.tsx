@@ -56,11 +56,17 @@ export default function ParcelasView({
   onSendToHuman
 }: ParcelasViewProps) {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterTurma, setFilterTurma] = useState<string>('ALL');
   const [filterCurso, setFilterCurso] = useState<string>('ALL');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -76,12 +82,13 @@ export default function ParcelasView({
   const cursos = useMemo(() => Array.from(new Set(parcelas.map(p => p.curso).filter(Boolean))).sort(), [parcelas]);
 
   const filtered = useMemo(() => {
+    const q = debouncedSearch.toLowerCase();
     return parcelas
       .filter(p => {
-        const matchesSearch =
-          p.alunoNome.toLowerCase().includes(search.toLowerCase()) ||
-          p.competencia.includes(search) ||
-          formatParcela(p).includes(search);
+        const matchesSearch = !q ||
+          p.alunoNome.toLowerCase().includes(q) ||
+          p.competencia.includes(q) ||
+          formatParcela(p).includes(q);
         const matchesStatus = filterStatus === 'ALL' || p.status === filterStatus;
         const matchesTurma = filterTurma === 'ALL' || p.turma === filterTurma;
         const matchesCurso = filterCurso === 'ALL' || p.curso === filterCurso;
@@ -94,7 +101,7 @@ export default function ParcelasView({
         if (nameComp !== 0) return nameComp;
         return a.numeroParcela - b.numeroParcela;
       });
-  }, [parcelas, search, filterStatus, filterTurma, filterCurso]);
+  }, [parcelas, debouncedSearch, filterStatus, filterTurma, filterCurso]);
 
   const totalRecebido = parcelas.filter(p => p.status === 'PAGO').reduce((a, c) => a + c.valorAtual, 0);
   const totalAVencer = parcelas.filter(p => p.status === 'PENDENTE').reduce((a, c) => a + c.valorAtual, 0);

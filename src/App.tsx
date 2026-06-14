@@ -182,6 +182,7 @@ export default function App() {
   const skipSyncRef = useRef(false);
   const pendingSyncRef = useRef(false);
   const isResettingRef = useRef(false);
+  const hasAutoFixedParcelasRef = useRef(false);
 
   const setIfChanged = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, nextValue: T) => {
     setter(prev => {
@@ -226,6 +227,31 @@ export default function App() {
     };
     fetchDB();
   }, []);
+
+  // Auto-fix: gera parcelas MATRICULA faltantes para alunos com registros incompletos no DB
+  useEffect(() => {
+    if (!dbLoaded || !isUsingApi || hasAutoFixedParcelasRef.current) return;
+    hasAutoFixedParcelasRef.current = true;
+
+    setParcelas((currentParcelas: Parcela[]) => {
+      const toAdd: Parcela[] = [];
+      alunos.forEach((aluno: Aluno) => {
+        if (!aluno.totalParcelas || !aluno.primeiroVencimentoEmAberto) return;
+        const restantes = Math.max(0, aluno.totalParcelas - (aluno.parcelasPagas ?? 0));
+        if (restantes <= 0) return;
+        const openCount = currentParcelas.filter(
+          (p: Parcela) => p.alunoId === aluno.id && p.origem === 'MATRICULA'
+            && (p.status === 'PENDENTE' || p.status === 'ATRASADO')
+        ).length;
+        if (openCount >= restantes) return;
+        toAdd.push(...generateParcelas(aluno, currentParcelas, 'MATRICULA'));
+      });
+      if (toAdd.length === 0) return currentParcelas;
+      console.log(`[Auto-fix] ${toAdd.length} parcelas faltantes geradas.`);
+      pendingSyncRef.current = true;
+      return [...toAdd, ...currentParcelas];
+    });
+  }, [dbLoaded, isUsingApi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll database updates from backend every 5 seconds
   useEffect(() => {
