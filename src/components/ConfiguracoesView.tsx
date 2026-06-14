@@ -106,6 +106,11 @@ export default function ConfiguracoesView({
   const [dispatchMinInterval, setDispatchMinInterval] = useState(globalSettings?.dispatchMinIntervalSec ?? 15);
   const [dispatchMaxInterval, setDispatchMaxInterval] = useState(globalSettings?.dispatchMaxIntervalSec ?? 45);
 
+  // Disparo agendado
+  const [schedEnabled, setSchedEnabled] = useState(globalSettings?.scheduledDispatch?.enabled ?? false);
+  const [schedHorario, setSchedHorario] = useState(globalSettings?.scheduledDispatch?.horario ?? '09:00');
+  const [schedDias, setSchedDias] = useState<number[]>(globalSettings?.scheduledDispatch?.diasSemana ?? [1,2,3,4,5]);
+
   const [testEmail, setTestEmail] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
 
@@ -128,6 +133,9 @@ export default function ConfiguracoesView({
       setTeamPhone(globalSettings.teamPhoneNumber);
       setDispatchMinInterval(globalSettings.dispatchMinIntervalSec ?? 15);
       setDispatchMaxInterval(globalSettings.dispatchMaxIntervalSec ?? 45);
+      setSchedEnabled(globalSettings.scheduledDispatch?.enabled ?? false);
+      setSchedHorario(globalSettings.scheduledDispatch?.horario ?? '09:00');
+      setSchedDias(globalSettings.scheduledDispatch?.diasSemana ?? [1,2,3,4,5]);
     }
   }, [globalSettings]);
 
@@ -185,10 +193,17 @@ export default function ConfiguracoesView({
     onUpdateGlobalSettings({
       teamPhoneNumber: teamPhone,
       dispatchMinIntervalSec: Number(dispatchMinInterval),
-      dispatchMaxIntervalSec: Number(dispatchMaxInterval)
+      dispatchMaxIntervalSec: Number(dispatchMaxInterval),
+      scheduledDispatch: {
+        enabled: schedEnabled,
+        horario: schedHorario,
+        diasSemana: schedDias,
+        ultimoDisparo: globalSettings?.scheduledDispatch?.ultimoDisparo,
+        ultimoResultado: globalSettings?.scheduledDispatch?.ultimoResultado
+      }
     });
 
-    onPostAlert('Configurações de Notificações, SMTP, WhatsApp da Equipe e Intervalo Anti-Ban salvas com sucesso!', 'success');
+    onPostAlert('Configurações salvas! Disparo agendado ' + (schedEnabled ? `ativado para ${schedHorario}.` : 'desativado.'), 'success');
   };
   
   const [activeProvider, setActiveProvider] = useState(() => {
@@ -1258,6 +1273,18 @@ export default function ConfiguracoesView({
                         safeSetItem('sentidos_evolution_global_token', evolutionGlobalToken.trim());
                         safeSetItem('sentidos_evolution_instance', evolutionInstance.trim());
                         safeSetItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
+                        onUpdateGlobalSettings({
+                          teamPhoneNumber: globalSettings?.teamPhoneNumber ?? '',
+                          dispatchMinIntervalSec: globalSettings?.dispatchMinIntervalSec ?? 15,
+                          dispatchMaxIntervalSec: globalSettings?.dispatchMaxIntervalSec ?? 45,
+                          scheduledDispatch: globalSettings?.scheduledDispatch,
+                          evolutionConfig: {
+                            url: evolutionUrl.trim(),
+                            instanceName: evolutionInstance.trim(),
+                            instanceToken: evolutionInstanceToken.trim(),
+                            globalToken: evolutionGlobalToken.trim(),
+                          }
+                        });
                         onPostAlert('Configurações da Evolution API salvas com sucesso!', 'success');
                       }}
                       className="bg-[#03045e] hover:bg-blue-900 text-white font-bold px-5 py-2 rounded-lg text-xs transition cursor-pointer"
@@ -1507,6 +1534,71 @@ export default function ConfiguracoesView({
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Disparo Agendado Automático */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center">
+                      <span className="text-indigo-600 text-sm">⏰</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-800">Disparo Agendado Automático</h3>
+                      <p className="text-[10px] text-gray-500 mt-0.5">O servidor enviará mensagens de cobrança automaticamente no horário configurado, sem precisar do navegador aberto.</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-[10px] text-gray-500">{schedEnabled ? 'Ativado' : 'Desativado'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSchedEnabled((v: boolean) => !v)}
+                        className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors cursor-pointer ${schedEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${schedEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {schedEnabled && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Horário do Disparo (Horário de Brasília)</label>
+                        <input
+                          type="time"
+                          value={schedHorario}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSchedHorario(e.target.value)}
+                          className="bg-white border border-indigo-200 rounded-lg text-xs p-2.5 focus:ring-1 focus:ring-indigo-500 focus:outline-hidden font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">Dias da Semana</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[['Dom',0],['Seg',1],['Ter',2],['Qua',3],['Qui',4],['Sex',5],['Sáb',6]].map(([label, d]) => {
+                            const day = d as number;
+                            const active = schedDias.includes(day);
+                            return (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => setSchedDias((prev: number[]) => active ? prev.filter((x: number) => x !== day) : [...prev, day].sort())}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}
+                              >
+                                {label as string}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {globalSettings?.scheduledDispatch?.ultimoResultado && (
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs">
+                          <p className="font-bold text-indigo-800 mb-0.5">Último disparo automático:</p>
+                          <p className="text-indigo-700">{globalSettings.scheduledDispatch.ultimoResultado}</p>
+                          {globalSettings.scheduledDispatch.ultimoDisparo && (
+                            <p className="text-[10px] text-indigo-500 mt-1">{new Date(globalSettings.scheduledDispatch.ultimoDisparo).toLocaleString('pt-BR')}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Save All Notificacoes Button */}

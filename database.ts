@@ -61,7 +61,11 @@ export function getInitialData(): DbData {
       active: false
     },
     globalSettings: {
-      teamPhoneNumber: ''
+      teamPhoneNumber: '',
+      dispatchMinIntervalSec: 15,
+      dispatchMaxIntervalSec: 45,
+      scheduledDispatch: { enabled: false, horario: '09:00', diasSemana: [1,2,3,4,5] },
+      evolutionConfig: { url: '', instanceName: '', instanceToken: '', globalToken: '' }
     }
   };
 }
@@ -403,8 +407,17 @@ export async function initDb(): Promise<void> {
 
       CREATE TABLE IF NOT EXISTS global_settings (
         id INTEGER PRIMARY KEY DEFAULT 1,
-        "teamPhoneNumber" VARCHAR(100) DEFAULT ''
+        "teamPhoneNumber" VARCHAR(100) DEFAULT '',
+        "dispatchMinIntervalSec" INTEGER DEFAULT 15,
+        "dispatchMaxIntervalSec" INTEGER DEFAULT 45,
+        "scheduledDispatch" JSONB DEFAULT NULL,
+        "evolutionConfig" JSONB DEFAULT NULL
       );
+
+      ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS "dispatchMinIntervalSec" INTEGER DEFAULT 15;
+      ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS "dispatchMaxIntervalSec" INTEGER DEFAULT 45;
+      ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS "scheduledDispatch" JSONB DEFAULT NULL;
+      ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS "evolutionConfig" JSONB DEFAULT NULL;
 
       -- Garante a existência do registro padrão id=1
       INSERT INTO smtp_config (id)
@@ -533,7 +546,11 @@ export async function readDB(): Promise<DbData> {
         active: smtp.active ?? false
       },
       globalSettings: {
-        teamPhoneNumber: globalS.teamPhoneNumber || ''
+        teamPhoneNumber: globalS.teamPhoneNumber || '',
+        dispatchMinIntervalSec: globalS.dispatchMinIntervalSec ?? 15,
+        dispatchMaxIntervalSec: globalS.dispatchMaxIntervalSec ?? 45,
+        scheduledDispatch: globalS.scheduledDispatch ?? { enabled: false, horario: '09:00', diasSemana: [1,2,3,4,5] },
+        evolutionConfig: globalS.evolutionConfig ?? { url: '', instanceName: '', instanceToken: '', globalToken: '' }
       }
     };
   } catch (error) {
@@ -689,8 +706,15 @@ export async function writeDB(data: DbData): Promise<void> {
     if (data.globalSettings) {
       const g = data.globalSettings;
       await client.query(
-        `INSERT INTO global_settings (id, "teamPhoneNumber") VALUES (1, $1)`,
-        cleanParams([g.teamPhoneNumber])
+        `INSERT INTO global_settings (id, "teamPhoneNumber", "dispatchMinIntervalSec", "dispatchMaxIntervalSec", "scheduledDispatch", "evolutionConfig")
+         VALUES (1, $1, $2, $3, $4, $5)`,
+        cleanParams([
+          g.teamPhoneNumber,
+          g.dispatchMinIntervalSec ?? 15,
+          g.dispatchMaxIntervalSec ?? 45,
+          g.scheduledDispatch ? JSON.stringify(g.scheduledDispatch) : null,
+          g.evolutionConfig ? JSON.stringify(g.evolutionConfig) : null
+        ])
       );
     }
 

@@ -554,11 +554,185 @@ if (fs.existsSync(distPath)) {
   console.log(`[Sentidos Cobranças] Servindo arquivos estáticos de: ${distPath}`);
 }
 
-// Initialize Database then Start Server
+// ─── Disparo Agendado (Scheduler) ───────────────────────────────────────────
+
+function parseDateBR(dateStr: string): Date | null {
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return null;
+  const d = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const y = parseInt(parts[2], 10);
+  if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+  return new Date(y, m, d);
+}
+
+function buildMsgScheduler(template: string, aluno: any, parcela: any): string {
+  const num = String(parcela.numeroParcela).padStart(2, '0');
+  const tot = String(parcela.totalParcelas).padStart(2, '0');
+  return template
+    .replace(/{nome_aluno}/g, aluno.nome)
+    .replace(/{curso}/g, aluno.curso)
+    .replace(/{valor}/g, `R$ ${Number(parcela.valorAtual).toFixed(2)}`)
+    .replace(/{vencimento}/g, parcela.vencimento)
+    .replace(/{parcela}/g, `${num}/${tot}`);
+}
+
+function sanitizePhoneScheduler(numStr: string): string {
+  const cleaned = (numStr || '').replace(/\D/g, '');
+  if (cleaned.length >= 10 && cleaned.length <= 11 && !cleaned.startsWith('55')) {
+    return '55' + cleaned;
+  }
+  return cleaned;
+}
+
+async function runScheduledDispatch(): Promise<void> {
+  try {
+    const db = await readDB();
+    const gs = (db as any).globalSettings || {};
+    const sd = gs.scheduledDispatch;
+    const evo = gs.evolutionConfig;
+
+    if (!sd?.enabled) return;
+    if (!evo?.url || !evo?.instanceName) {
+      console.warn('[Agendador] Evolution API não configurada no banco. Disparo agendado ignorado.');
+      return;
+    }
+
+    // Horário de Brasília (UTC-3)
+    const nowUtc = new Date();
+    const brazilMs = nowUtc.getTime() - 3 * 60 * 60 * 1000;
+    const brazilNow = new Date(brazilMs);
+    const hh = String(brazilNow.getUTCHours()).padStart(2, '0');
+    const mm = String(brazilNow.getUTCMinutes()).padStart(2, '0');
+    const currentTime = `${hh}:${mm}`;
+    const currentDay = brazilNow.getUTCDay(); // 0=Dom
+
+    if (currentTime !== sd.horario) return;
+    if (!(sd.diasSemana as number[]).includes(currentDay)) return;
+
+    // Evita duplo disparo na mesma janela de 1 minuto
+    if (sd.ultimoDisparo) {
+      const minutosSinceLastRun = (nowUtc.getTime() - new Date(sd.ultimoDisparo).getTime()) / 60000;
+      if (minutosSinceLastRun < 5) return;
+    }
+
+    console.log(`[Agendador] Iniciando disparo agendado às ${currentTime} (horário de Brasília)...`);
+
+    const today = new Date(
+      brazilNow.getUTCFullYear(),
+      brazilNow.getUTCMonth(),
+      brazilNow.getUTCDate()
+    );
+
+    const apiKey = (evo.instanceToken || evo.globalToken || '').trim();
+    const apiBase = evo.url.replace(/\/$/, '');
+    const instanceName = evo.instanceName;
+
+    let enviadas = 0;
+    const erros: string[] = [];
+    const dbParcelas: any[] = db.parcelas;
+
+    for (const regra of db.regras) {
+      if (!regra.ativo) continue;
+      const canal = regra.canal || 'WHATSAPP';
+      if (canal !== 'WHATSAPP' && canal !== 'AMBOS') continue;
+
+      for (let pi = 0; pi < dbParcelas.length; pi++) {
+        const parcela = dbParcelas[pi];
+        if (parcela.status !== 'PENDENTE' && parcela.status !== 'ATRASADO') continue;
+
+        const aluno = (db.alunos as any[]).find((a: any) => a.id === parcela.alunoId);
+        if (!aluno || aluno.cobrancaAutomatica === false) continue;
+
+        // Avalia se a régua se aplica hoje
+        const vencDate = parseDateBR(parcela.vencimento);
+        if (!vencDate) continue;
+        const diffDias = Math.round((vencDate.getTime() - today.getTime()) / 86400000);
+
+        let matches = false;
+        if (regra.tipoGatilho === 'ANTES' && diffDias === Number(regra.diasGatilho)) matches = true;
+        if (regra.tipoGatilho === 'DIA_VENCIMENTO' && diffDias === 0) matches = true;
+        if (regra.tipoGatilho === 'DEPOIS' && diffDias === -Math.abs(Number(regra.diasGatilho))) matches = true;
+        if (!matches) continue;
+
+        // Anti-duplicidade: não enviar mais de uma vez por dia para a mesma parcela
+        if (parcela.ultimoEnvio) {
+          const lastMs = new Date(parcela.ultimoEnvio).getTime();
+          if ((nowUtc.getTime() - lastMs) < 23 * 3600 * 1000) continue;
+        }
+
+        const texto = buildMsgScheduler(regra.mensagemTemplate, aluno, parcela);
+        const phone = sanitizePhoneScheduler(aluno.whatsapp);
+
+        try {
+          const resp = await fetch(`${apiBase}/message/sendText/${instanceName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+            body: JSON.stringify({ number: phone, text: texto, delay: 1200, linkPreview: false })
+          });
+          if (resp.ok) {
+            enviadas++;
+            const nowIso = nowUtc.toISOString();
+            dbParcelas[pi] = {
+              ...dbParcelas[pi],
+              enviadoWhatsAppCount: (dbParcelas[pi].enviadoWhatsAppCount || 0) + 1,
+              ultimoEnvio: nowIso,
+              atualizadoEm: nowIso
+            };
+          } else {
+            erros.push(`${aluno.nome}: HTTP ${resp.status}`);
+          }
+        } catch (err: any) {
+          erros.push(`${aluno.nome}: ${err.message}`);
+        }
+
+        // Delay anti-ban entre envios
+        await new Promise(r => setTimeout(r, 2500));
+      }
+    }
+
+    const dataFmt = brazilNow.toLocaleDateString('pt-BR');
+    const resultado = `${enviadas} mensagem(ns) enviada(s) em ${dataFmt}${erros.length ? ` | ${erros.length} erro(s): ${erros.slice(0, 3).join('; ')}` : ''}`;
+
+    (db as any).globalSettings = {
+      ...gs,
+      scheduledDispatch: {
+        ...sd,
+        ultimoDisparo: nowUtc.toISOString(),
+        ultimoResultado: resultado
+      }
+    };
+    db.parcelas = dbParcelas;
+
+    const logTimestamp = nowUtc.toISOString().replace('T', ' ').substring(0, 19);
+    db.logs.unshift({
+      id: `log-${Date.now()}`,
+      timestamp: logTimestamp,
+      tipo: 'SISTEMA',
+      usuario: 'Agendador',
+      detalhe: `Disparo agendado: ${resultado}`,
+      sucesso: erros.length === 0
+    } as any);
+
+    await writeDB(db as any);
+    console.log(`[Agendador] ${resultado}`);
+
+  } catch (err: any) {
+    console.error('[Agendador] Erro no disparo agendado:', err.message || err);
+  }
+}
+
+// ─── Initialize Database then Start Server ───────────────────────────────────
+
 initDb().then(() => {
   app.listen(PORT, () => {
     console.log(`[Sentidos Cobranças] Servidor rodando na porta ${PORT}`);
   });
+
+  // Verificar a cada 60 segundos se é hora do disparo agendado
+  setInterval(runScheduledDispatch, 60 * 1000);
+  console.log('[Agendador] Scheduler iniciado (verificação a cada 60s).');
+
 }).catch(err => {
   console.error('[Sentidos Cobranças] Erro catastrófico ao inicializar o banco de dados:', err);
   process.exit(1);

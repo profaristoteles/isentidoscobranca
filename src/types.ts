@@ -130,9 +130,26 @@ export interface SmtpConfig {
   active: boolean;
 }
 
+export interface ScheduledDispatch {
+  enabled: boolean;
+  horario: string;           // "09:00" — hora do disparo (horário de Brasília)
+  diasSemana: number[];      // 0=Dom, 1=Seg … 6=Sáb
+  ultimoDisparo?: string;    // ISO timestamp do último disparo executado
+  ultimoResultado?: string;  // descrição do resultado do último disparo
+}
+
+export interface EvolutionConfig {
+  url: string;
+  instanceName: string;
+  instanceToken: string;
+  globalToken: string;
+}
+
 export interface GlobalSettings {
   teamPhoneNumber: string;
-  dispatchMinIntervalSec: number; // min seconds between bulk dispatches (anti-ban)
-  dispatchMaxIntervalSec: number; // max seconds between bulk dispatches (anti-ban)
+  dispatchMinIntervalSec: number;
+  dispatchMaxIntervalSec: number;
+  scheduledDispatch?: ScheduledDispatch;
+  evolutionConfig?: EvolutionConfig;
 }
 
