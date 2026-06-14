@@ -267,7 +267,7 @@ export default function App() {
 
     pendingSyncRef.current = true;
 
-    const syncToBackend = async () => {
+    const syncToBackend = async (attempt = 1) => {
       if (isResettingRef.current) {
         pendingSyncRef.current = false;
         return;
@@ -293,12 +293,25 @@ export default function App() {
           })
         });
         if (!response.ok) {
-          console.error('[Sentidos Cobranças] Falha ao sincronizar dados no backend.');
+          const errText = await response.text().catch(() => '');
+          console.error(`[Sentidos Cobranças] Falha ao sincronizar (tentativa ${attempt}): ${response.status} ${errText}`);
+          if (attempt < 5) {
+            setTimeout(() => syncToBackend(attempt + 1), 2000 * attempt);
+          } else {
+            console.error('[Sentidos Cobranças] Máximo de tentativas atingido. Liberando poll.');
+            pendingSyncRef.current = false;
+          }
+          return;
         }
-      } catch (err) {
-        console.error('[Sentidos Cobranças] Erro de rede ao sincronizar dados no backend.', err);
-      } finally {
         pendingSyncRef.current = false;
+      } catch (err) {
+        console.error(`[Sentidos Cobranças] Erro de rede ao sincronizar (tentativa ${attempt}):`, err);
+        if (attempt < 5) {
+          setTimeout(() => syncToBackend(attempt + 1), 2000 * attempt);
+        } else {
+          console.error('[Sentidos Cobranças] Máximo de tentativas atingido. Liberando poll.');
+          pendingSyncRef.current = false;
+        }
       }
     };
 

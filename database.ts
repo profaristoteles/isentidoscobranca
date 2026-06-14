@@ -310,6 +310,7 @@ export async function initDb(): Promise<void> {
       ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "diaVencimento" INTEGER;
       ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "dataMatriculaFinanceira" VARCHAR(50);
       ALTER TABLE alunos ADD COLUMN IF NOT EXISTS observacoes TEXT;
+      ALTER TABLE alunos ADD COLUMN IF NOT EXISTS "situacaoAcademica" VARCHAR(50);
 
       CREATE TABLE IF NOT EXISTS parcelas (
         id VARCHAR(100) PRIMARY KEY,
@@ -368,6 +369,15 @@ export async function initDb(): Promise<void> {
 
       ALTER TABLE regras ADD COLUMN IF NOT EXISTS canal VARCHAR(50) DEFAULT 'WHATSAPP';
       ALTER TABLE regras ADD COLUMN IF NOT EXISTS destinatario VARCHAR(50) DEFAULT 'ALUNO';
+
+      CREATE TABLE IF NOT EXISTS logs (
+        id VARCHAR(100) PRIMARY KEY,
+        "timestamp" VARCHAR(50) NOT NULL,
+        tipo VARCHAR(50) NOT NULL,
+        usuario VARCHAR(255) NOT NULL,
+        detalhe TEXT NOT NULL,
+        sucesso BOOLEAN DEFAULT TRUE
+      );
 
       CREATE TABLE IF NOT EXISTS crm_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -577,14 +587,14 @@ export async function writeDB(data: DbData): Promise<void> {
             "statusFinanceiro", "valorPendente", "avatarUrl", "cadastroData",
             modalidade, "cobrancaAutomatica", turma, "valorMensalidade",
             "totalParcelas", "parcelasPagas", "primeiroVencimentoEmAberto",
-            "diaVencimento", "dataMatriculaFinanceira", observacoes
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+            "diaVencimento", "dataMatriculaFinanceira", observacoes, "situacaoAcademica"
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
           cleanParams([
             a.id, a.nome, a.cpf, a.matricula, a.curso, a.polo, a.whatsapp, a.email,
             a.statusFinanceiro, a.valorPendente, a.avatarUrl, a.cadastroData,
             a.modalidade, a.cobrancaAutomatica ?? true, a.turma, a.valorMensalidade,
             a.totalParcelas, a.parcelasPagas, a.primeiroVencimentoEmAberto,
-            a.diaVencimento, a.dataMatriculaFinanceira, a.observacoes
+            a.diaVencimento, a.dataMatriculaFinanceira, a.observacoes, a.situacaoAcademica ?? null
           ])
         );
       }

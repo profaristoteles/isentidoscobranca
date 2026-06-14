@@ -133,12 +133,32 @@ export default function StudentsView({
       return;
     }
     
+    const parseCsvLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      const sep = line.includes(';') && !line.includes(',') ? ';' : ',';
+      for (let ci = 0; ci < line.length; ci++) {
+        const ch = line[ci];
+        if (ch === '"') {
+          inQuotes = !inQuotes;
+        } else if ((ch === sep || ch === ';') && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const parsedList: any[] = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const parts = line.split(/[;,]/).map(p => p.trim());
+      const parts = parseCsvLine(line);
       
       if (parts.length < 5) {
         if (i === 0 && line.toLowerCase().includes('nome')) {
