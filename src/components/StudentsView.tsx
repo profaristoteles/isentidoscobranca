@@ -74,7 +74,6 @@ export default function StudentsView({
         setParcelasPagas(student.parcelasPagas !== undefined ? String(student.parcelasPagas) : '');
         setPrimeiroVencimento(student.primeiroVencimentoEmAberto || '');
         setDiaVencimento(student.diaVencimento !== undefined ? String(student.diaVencimento) : '');
-        setDataMatricula(student.dataMatriculaFinanceira || '');
       }
     } else {
       resetForm();
@@ -98,7 +97,6 @@ export default function StudentsView({
   const [parcelasPagas, setParcelasPagas] = useState('');
   const [primeiroVencimento, setPrimeiroVencimento] = useState('');
   const [diaVencimento, setDiaVencimento] = useState('');
-  const [dataMatricula, setDataMatricula] = useState('');
   
   // Bulk fields
   const [bulkText, setBulkText] = useState('');
@@ -120,7 +118,6 @@ export default function StudentsView({
     setParcelasPagas('');
     setPrimeiroVencimento('');
     setDiaVencimento('');
-    setDataMatricula('');
     setBulkText('');
     setBulkParsed([]);
     setBulkError(null);
@@ -244,7 +241,6 @@ export default function StudentsView({
         parcelasPagas: numOrUndef(parcelasPagas) ?? 0,
         primeiroVencimentoEmAberto: primeiroVencimento.trim() || undefined,
         diaVencimento: numOrUndef(diaVencimento),
-        dataMatriculaFinanceira: dataMatricula.trim() || undefined
       });
     } else {
       onAddAlunos([{
@@ -262,7 +258,6 @@ export default function StudentsView({
         parcelasPagas: numOrUndef(parcelasPagas) ?? 0,
         primeiroVencimentoEmAberto: primeiroVencimento.trim() || undefined,
         diaVencimento: numOrUndef(diaVencimento),
-        dataMatriculaFinanceira: dataMatricula.trim() || undefined
       }]);
     }
 
@@ -809,10 +804,6 @@ export default function StudentsView({
                       <div>
                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Dia Vencimento</label>
                         <input type="number" value={diaVencimento} onChange={(e) => setDiaVencimento(e.target.value)} placeholder="10" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Data da Matrícula</label>
-                        <input type="text" value={dataMatricula} onChange={(e) => setDataMatricula(e.target.value)} placeholder="15/02/2025" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#ff8000]" />
                       </div>
                     </div>
                     <p className="text-[10px] text-gray-400">O 1º vencimento pode ser uma data passada — parcelas já vencidas nascem como ATRASADO.</p>
