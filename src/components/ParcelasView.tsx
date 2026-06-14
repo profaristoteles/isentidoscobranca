@@ -76,16 +76,24 @@ export default function ParcelasView({
   const cursos = useMemo(() => Array.from(new Set(parcelas.map(p => p.curso).filter(Boolean))).sort(), [parcelas]);
 
   const filtered = useMemo(() => {
-    return parcelas.filter(p => {
-      const matchesSearch =
-        p.alunoNome.toLowerCase().includes(search.toLowerCase()) ||
-        p.competencia.includes(search) ||
-        formatParcela(p).includes(search);
-      const matchesStatus = filterStatus === 'ALL' || p.status === filterStatus;
-      const matchesTurma = filterTurma === 'ALL' || p.turma === filterTurma;
-      const matchesCurso = filterCurso === 'ALL' || p.curso === filterCurso;
-      return matchesSearch && matchesStatus && matchesTurma && matchesCurso;
-    });
+    return parcelas
+      .filter(p => {
+        const matchesSearch =
+          p.alunoNome.toLowerCase().includes(search.toLowerCase()) ||
+          p.competencia.includes(search) ||
+          formatParcela(p).includes(search);
+        const matchesStatus = filterStatus === 'ALL' || p.status === filterStatus;
+        const matchesTurma = filterTurma === 'ALL' || p.turma === filterTurma;
+        const matchesCurso = filterCurso === 'ALL' || p.curso === filterCurso;
+        return matchesSearch && matchesStatus && matchesTurma && matchesCurso;
+      })
+      .sort((a, b) => {
+        const dateComp = a.vencimento.localeCompare(b.vencimento);
+        if (dateComp !== 0) return dateComp;
+        const nameComp = a.alunoNome.localeCompare(b.alunoNome);
+        if (nameComp !== 0) return nameComp;
+        return a.numeroParcela - b.numeroParcela;
+      });
   }, [parcelas, search, filterStatus, filterTurma, filterCurso]);
 
   const totalRecebido = parcelas.filter(p => p.status === 'PAGO').reduce((a, c) => a + c.valorAtual, 0);

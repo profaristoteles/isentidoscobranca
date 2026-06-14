@@ -60,7 +60,14 @@ import {
   novoHistorico
 } from './utils/parcelas';
 
-const isSameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const normalizeForCompare = (val: unknown): unknown => {
+  if (Array.isArray(val) && val.length > 0 && val[0] !== null && typeof val[0] === 'object' && 'id' in (val[0] as object)) {
+    return [...val].sort((x: any, y: any) => String(x.id).localeCompare(String(y.id)));
+  }
+  return val;
+};
+const isSameJson = (a: unknown, b: unknown) =>
+  JSON.stringify(normalizeForCompare(a)) === JSON.stringify(normalizeForCompare(b));
 
 const nowIso = () => new Date().toISOString();
 const logTimestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);

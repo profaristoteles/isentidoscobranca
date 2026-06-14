@@ -495,7 +495,8 @@ export async function readDB(): Promise<DbData> {
       alunos: alunosRes.rows.map(a => ({
         ...a,
         valorPendente: parseFloat(a.valorPendente),
-        valorMensalidade: a.valorMensalidade != null ? parseFloat(a.valorMensalidade) : undefined
+        valorMensalidade: a.valorMensalidade != null ? parseFloat(a.valorMensalidade) : undefined,
+        situacaoAcademica: a.situacaoAcademica || 'ATIVO'
       })),
       parcelas: parcelasRes.rows.map(p => ({
         ...p,
