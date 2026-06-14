@@ -390,18 +390,26 @@ export default function App() {
         const emAberto = studentParcelas.filter(p => p.status === 'PENDENTE' || p.status === 'ATRASADO' || p.status === 'NEGOCIADO');
         const pendingSum = emAberto.reduce((acc, curr) => acc + curr.valorAtual, 0);
 
+        // Quando os registros de parcelas estão incompletos (geração pendente),
+        // usa o contrato financeiro para não subestimar o débito.
+        const restantesContrato = Math.max(0, (student.totalParcelas ?? 0) - (student.parcelasPagas ?? 0));
+        const valorContrato = restantesContrato * (student.valorMensalidade ?? 0);
+        const effectivePendingSum = (restantesContrato > emAberto.length && valorContrato > pendingSum)
+          ? valorContrato
+          : pendingSum;
+
         let financialStatus: Aluno['statusFinanceiro'] = 'EM_DIA';
-        if (emAberto.length > 0) {
+        if (restantesContrato > 0 || emAberto.length > 0) {
           const hasOverdue = emAberto.some(p => p.status === 'ATRASADO');
           financialStatus = hasOverdue ? 'INADIMPLENTE' : 'PENDENTE';
         }
 
-        if (student.valorPendente === pendingSum && student.statusFinanceiro === financialStatus) {
+        if (student.valorPendente === effectivePendingSum && student.statusFinanceiro === financialStatus) {
           return student;
         }
 
         hasChanges = true;
-        return { ...student, valorPendente: pendingSum, statusFinanceiro: financialStatus };
+        return { ...student, valorPendente: effectivePendingSum, statusFinanceiro: financialStatus };
       });
 
       return hasChanges ? nextAlunos : prevAlunos;

@@ -58,7 +58,9 @@ export default function StudentDetailView({
     .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
   const emAberto = studentParcelas.filter(p => p.status === 'PENDENTE' || p.status === 'ATRASADO' || p.status === 'NEGOCIADO');
-  const restantes = emAberto.length;
+  const restantesContrato = Math.max(0, (student.totalParcelas ?? 0) - (student.parcelasPagas ?? 0));
+  // Prefere o contrato financeiro; recorre aos registros reais se o contrato for 0.
+  const restantes = restantesContrato > 0 ? restantesContrato : emAberto.length;
 
   const getStatusLabelAndStyle = (status: Aluno['statusFinanceiro']) => {
     switch (status) {
