@@ -29,6 +29,9 @@ interface StudentsViewProps {
   onUpdateAluno: (alunoId: string, updatedFields: Partial<Aluno>) => void;
   onDeleteAluno: (alunoId: string) => void;
   onToggleCobrancaAutomatica: (alunoId: string) => void;
+  onRecalculateParcelas?: (alunoId: string) => void;
+  editStudentRequestedId?: string | null;
+  onEditHandled?: () => void;
 }
 
 export default function StudentsView({ 
@@ -40,7 +43,10 @@ export default function StudentsView({
   onAddAlunos,
   onUpdateAluno,
   onDeleteAluno,
-  onToggleCobrancaAutomatica
+  onToggleCobrancaAutomatica,
+  onRecalculateParcelas,
+  editStudentRequestedId,
+  onEditHandled
 }: StudentsViewProps) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -80,6 +86,17 @@ export default function StudentsView({
     }
   }, [editingStudentId, alunos]);
   
+  useEffect(() => {
+    if (editStudentRequestedId) {
+      setEditingStudentId(editStudentRequestedId);
+      setActiveTab('INDIVIDUAL');
+      setShowModal(true);
+      if (onEditHandled) {
+        onEditHandled();
+      }
+    }
+  }, [editStudentRequestedId, onEditHandled]);
+
   // Individual fields
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');

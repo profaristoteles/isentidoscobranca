@@ -92,6 +92,7 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(() => {
     return safeGetItem('sentidos_selected_student_id');
   });
+  const [editStudentRequestedId, setEditStudentRequestedId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // API Connection/Loaded State
@@ -1210,6 +1211,47 @@ export default function App() {
     );
   };
 
+  const handleRecalculateParcelas = (alunoId: string) => {
+    const student = alunos.find(a => a.id === alunoId);
+    if (!student) return;
+
+    const FINAL_STATUSES = ['PAGO', 'ISENTO', 'CANCELADO', 'NEGOCIADO'];
+    let novasParcelas: Parcela[] = [];
+
+    setParcelas(prev => {
+      const kept = prev.filter(
+        p => p.alunoId !== alunoId || p.origem !== 'MATRICULA' || FINAL_STATUSES.includes(p.status)
+      );
+      novasParcelas = generateParcelas(student, kept, 'MATRICULA');
+      return novasParcelas.length > 0 ? [...novasParcelas, ...kept] : kept;
+    });
+
+    if (novasParcelas.length > 0) {
+      setParcelaHistorico(prev => [
+        ...novasParcelas.map(p =>
+          novoHistorico(
+            p.id, p.alunoId,
+            'Parcela recriada (Recálculo Forçado)',
+            `Parcela ${formatParcela(p)} recriada através do recálculo manual.`,
+            userEmail || undefined
+          )
+        ),
+        ...prev
+      ]);
+    }
+
+    const newLog: LogAtividade = {
+      id: `log-${Date.now()}`,
+      timestamp: logTimestamp(),
+      tipo: 'USUARIO',
+      usuario: userEmail || 'adm.financeiro',
+      detalhe: `Parcelas do estudante ${student.nome} foram recalculadas manualmente.`,
+      sucesso: true
+    };
+    setLogs(prev => [newLog, ...prev]);
+    postToastAlert(`Parcelas de ${student.nome} foram recalculadas!`, 'success');
+  };
+
   // Core Conditional router rendering
   const renderCurrentView = () => {
     switch (currentTab) {
@@ -1241,6 +1283,11 @@ export default function App() {
                   onUndoMarkPaid={handleUndoParcelaPaid}
                   onSimulateDeal={handleSimulateDeal}
                   onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
+                  onEditStudent={(id) => {
+                    setSelectedStudentId(null);
+                    setEditStudentRequestedId(id);
+                  }}
+                  onRecalculateParcelas={handleRecalculateParcelas}
                 />
               </div>
             );
@@ -1250,14 +1297,24 @@ export default function App() {
           <div className="animate-fade-in transition duration-300">
             <StudentsView
               alunos={alunos}
+              parcelas={parcelas}
+              parcelaHistorico={parcelaHistorico}
+              mensagens={mensagens}
               polos={polos}
               cursos={cursos}
               onSelectStudent={handleSelectStudentJump}
               onFastWhatsAppNotification={handleFastWhatsAppNotification}
+              editStudentRequestedId={editStudentRequestedId}
+              onEditHandled={() => setEditStudentRequestedId(null)}
               onAddAlunos={handleAddAlunos}
               onUpdateAluno={handleUpdateAluno}
               onDeleteAluno={handleDeleteAluno}
               onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
+              onSendCustomWhatsApp={handleSendCustomWhatsApp}
+              onMarkPaid={handleMarkParcelaPaid}
+              onUndoMarkPaid={handleUndoParcelaPaid}
+              onSimulateDeal={handleSimulateDeal}
+              onRecalculateParcelas={handleRecalculateParcelas}
             />
           </div>
         );

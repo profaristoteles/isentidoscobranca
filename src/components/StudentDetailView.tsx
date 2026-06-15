@@ -24,6 +24,7 @@ interface StudentDetailViewProps {
   onUndoMarkPaid?: (parcelaId: string) => void;
   onToggleCobrancaAutomatica: (alunoId: string) => void;
   onEditStudent?: (alunoId: string) => void;
+  onRecalculateParcelas?: (alunoId: string) => void;
 }
 
 const STATUS_STYLE: Record<StatusParcela, string> = {
@@ -46,7 +47,8 @@ export default function StudentDetailView({
   onUndoMarkPaid,
   onSimulateDeal,
   onToggleCobrancaAutomatica,
-  onEditStudent
+  onEditStudent,
+  onRecalculateParcelas
 }: StudentDetailViewProps) {
   const [customMsg, setCustomMsg] = useState('');
   const [isNegotiating, setIsNegotiating] = useState(false);
@@ -99,6 +101,22 @@ export default function StudentDetailView({
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar à lista
             </button>
+            {onRecalculateParcelas && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Isso apagará e recriará as parcelas não pagas deste aluno. Deseja continuar?')) {
+                    onRecalculateParcelas(student.id);
+                  }
+                }}
+                className="flex items-center text-sm font-medium text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
+                title="Forçar a recriação de todas as parcelas pendentes"
+              >
+                <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Recalcular Parcelas
+              </button>
+            )}
             {onEditStudent && (
               <button
                 onClick={() => onEditStudent(student.id)}
