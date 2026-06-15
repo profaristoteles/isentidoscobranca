@@ -635,7 +635,7 @@ async function runScheduledDispatch(): Promise<void> {
     for (const regra of db.regras) {
       if (!regra.ativo) continue;
       const canal = regra.canal || 'WHATSAPP';
-      if (canal !== 'WHATSAPP' && canal !== 'AMBOS') continue;
+      if (canal !== 'WHATSAPP' && canal !== 'EMAIL' && canal !== 'AMBOS') continue;
 
       for (let pi = 0; pi < dbParcelas.length; pi++) {
         const parcela = dbParcelas[pi];
@@ -664,26 +664,60 @@ async function runScheduledDispatch(): Promise<void> {
         const texto = buildMsgScheduler(regra.mensagemTemplate, aluno, parcela);
         const phone = sanitizePhoneScheduler(aluno.whatsapp);
 
-        try {
-          const resp = await fetch(`${apiBase}/message/sendText/${instanceName}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
-            body: JSON.stringify({ number: phone, text: texto, delay: 1200, linkPreview: false })
-          });
-          if (resp.ok) {
-            enviadas++;
-            const nowIso = nowUtc.toISOString();
-            dbParcelas[pi] = {
-              ...dbParcelas[pi],
-              enviadoWhatsAppCount: (dbParcelas[pi].enviadoWhatsAppCount || 0) + 1,
-              ultimoEnvio: nowIso,
-              atualizadoEm: nowIso
-            };
-          } else {
-            erros.push(`${aluno.nome}: HTTP ${resp.status}`);
+        let enviouNesteCiclo = false;
+
+        // Envio de E-mail
+        if ((canal === 'EMAIL' || canal === 'AMBOS') && aluno.email && db.smtpConfig && db.smtpConfig.active) {
+          try {
+            const transporter = nodemailer.createTransport({
+              host: db.smtpConfig.host,
+              port: Number(db.smtpConfig.port),
+              secure: db.smtpConfig.secure ?? false,
+              auth: {
+                user: db.smtpConfig.user,
+                pass: db.smtpConfig.pass
+              }
+            });
+            await transporter.sendMail({
+              from: `"${db.smtpConfig.fromName || 'Instituto Sentidos'}" <${db.smtpConfig.fromEmail}>`,
+              to: aluno.email,
+              subject: `Aviso: ${regra.titulo} (Instituto Sentidos)`,
+              text: texto.replace(/<[^>]*>/g, ''),
+              html: \`<p style="white-space: pre-wrap; font-family: sans-serif;">\${texto}</p>\`
+            });
+            enviouNesteCiclo = true;
+          } catch (err: any) {
+            erros.push(\`\${aluno.nome} (E-mail): \${err.message}\`);
           }
-        } catch (err: any) {
-          erros.push(`${aluno.nome}: ${err.message}`);
+        }
+
+        // Envio de WhatsApp
+        if (canal === 'WHATSAPP' || canal === 'AMBOS') {
+          try {
+            const resp = await fetch(\`\${apiBase}/message/sendText/\${instanceName}\`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+              body: JSON.stringify({ number: phone, text: texto, delay: 1200, linkPreview: false })
+            });
+            if (resp.ok) {
+              enviouNesteCiclo = true;
+            } else {
+              erros.push(\`\${aluno.nome} (WhatsApp): HTTP \${resp.status}\`);
+            }
+          } catch (err: any) {
+            erros.push(\`\${aluno.nome} (WhatsApp): \${err.message}\`);
+          }
+        }
+
+        if (enviouNesteCiclo) {
+          enviadas++;
+          const nowIso = nowUtc.toISOString();
+          dbParcelas[pi] = {
+            ...dbParcelas[pi],
+            enviadoWhatsAppCount: (dbParcelas[pi].enviadoWhatsAppCount || 0) + 1,
+            ultimoEnvio: nowIso,
+            atualizadoEm: nowIso
+          };
         }
 
         // Delay anti-ban entre envios

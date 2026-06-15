@@ -23,6 +23,7 @@ interface ParcelasViewProps {
   parcelas: Parcela[];
   alunos: Aluno[];
   onMarkPaid: (id: string) => void;
+  onUndoMarkPaid?: (id: string) => void;
   onRegisterNegotiation: (id: string, observacao?: string) => void;
   onEditDueDate: (id: string, novoVencimento: string) => void;
   onEditValor: (id: string, novoValor: number) => void;
@@ -46,6 +47,7 @@ export default function ParcelasView({
   parcelas,
   alunos,
   onMarkPaid,
+  onUndoMarkPaid,
   onRegisterNegotiation,
   onEditDueDate,
   onEditValor,
@@ -306,6 +308,14 @@ export default function ParcelasView({
                             className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 font-bold px-2 py-1.5 rounded-lg border border-emerald-200 text-[10px] transition cursor-pointer shrink-0"
                           >
                             ✓ Pago
+                          </button>
+                        )}
+                        {p.status === 'PAGO' && onUndoMarkPaid && (
+                          <button
+                            onClick={() => onUndoMarkPaid(p.id)}
+                            className="bg-gray-50 text-gray-700 hover:bg-gray-100 font-bold px-2 py-1.5 rounded-lg border border-gray-200 text-[10px] transition cursor-pointer shrink-0"
+                          >
+                            ⤺ Desfazer
                           </button>
                         )}
                         {emAberto(p) && (

@@ -491,6 +491,32 @@ export default function App() {
     postToastAlert(`Parcela ${formatParcela(target)} de ${target.alunoNome} marcada como paga.`, 'success');
   };
 
+  // Operation: undo a payment for a single parcela
+  const handleUndoParcelaPaid = (parcelaId: string) => {
+    const target = parcelas.find(p => p.id === parcelaId);
+    if (!target) return;
+
+    // Determine original status based on due date
+    const emAbertoSimulado = { ...target, status: 'PENDENTE' as const };
+    const expectedStatus = getStatusEfetivo(emAbertoSimulado);
+
+    updateParcela(parcelaId, { status: expectedStatus, dataPagamento: undefined });
+    logParcelaHistorico(parcelaId, target.alunoId, 'Pagamento Desfeito',
+      `Pagamento da parcela ${formatParcela(target)} foi desfeito. Status revertido para ${expectedStatus}.`);
+
+    const newLog: LogAtividade = {
+      id: `log-${Date.now()}`,
+      timestamp: logTimestamp(),
+      tipo: 'CRM',
+      usuario: 'Operador Financeiro',
+      detalhe: `Pagamento da parcela ${formatParcela(target)} de ${target.alunoNome} desfeito manualmente.`,
+      sucesso: true
+    };
+    setLogs(prev => [newLog, ...prev]);
+
+    postToastAlert(`Pagamento da parcela ${formatParcela(target)} foi desfeito.`, 'warning');
+  };
+
   // Operation: register a negotiation on a single parcela (sem gerar novas parcelas)
   const handleRegisterNegotiation = (parcelaId: string, observacao?: string) => {
     const target = parcelas.find(p => p.id === parcelaId);
@@ -1212,6 +1238,7 @@ export default function App() {
                   onBack={() => setSelectedStudentId(null)}
                   onSendCustomWhatsApp={(alunoId, txt) => handleSendMessage(alunoId, txt, 'HUMANO_AGENTE')}
                   onMarkPaid={handleMarkParcelaPaid}
+                  onUndoMarkPaid={handleUndoParcelaPaid}
                   onSimulateDeal={handleSimulateDeal}
                   onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
                 />
@@ -1241,6 +1268,7 @@ export default function App() {
               parcelas={parcelas}
               alunos={alunos}
               onMarkPaid={handleMarkParcelaPaid}
+              onUndoMarkPaid={handleUndoParcelaPaid}
               onRegisterNegotiation={handleRegisterNegotiation}
               onEditDueDate={handleEditDueDate}
               onEditValor={handleEditValor}

@@ -814,7 +814,7 @@ export default function StudentsView({
                   <div>
                     <p className="text-[11px] text-gray-500 leading-relaxed">
                       Cole linhas separadas por vírgula (<code>,</code>) ou ponto-e-vírgula (<code>;</code>) na ordem:<br />
-                      <strong>Nome, E-mail, CPF, WhatsApp, Curso, Polo, Modalidade, Turma, Mensalidade, Total Parcelas, Parcelas Pagas, 1º Vencimento (DD/MM/AAAA), Dia Vencimento</strong>.
+                      <strong>Nome, E-mail, CPF, WhatsApp, Curso, Polo, Modalidade, Turma, Mensalidade, Total Parcelas, Parcelas Pagas, 1º Venc. em Aberto, Dia Vencimento</strong>.
                     </p>
                     <p className="text-[10px] text-gray-400 mt-1">
                       As 6 primeiras colunas são obrigatórias; as financeiras geram as parcelas. O 1º vencimento pode ser passado (gera parcelas já vencidas e a vencer).

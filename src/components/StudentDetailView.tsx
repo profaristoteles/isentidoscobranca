@@ -21,6 +21,7 @@ interface StudentDetailViewProps {
   onBack: () => void;
   onSendCustomWhatsApp: (alunoId: string, text: string) => void;
   onMarkPaid: (parcelaId: string) => void;
+  onUndoMarkPaid?: (parcelaId: string) => void;
   onSimulateDeal: (alunoId: string, parcelas: number, valorTotal: number) => void;
   onToggleCobrancaAutomatica: (alunoId: string) => void;
 }
@@ -42,6 +43,7 @@ export default function StudentDetailView({
   onBack,
   onSendCustomWhatsApp,
   onMarkPaid,
+  onUndoMarkPaid,
   onSimulateDeal,
   onToggleCobrancaAutomatica
 }: StudentDetailViewProps) {
@@ -239,6 +241,9 @@ export default function StudentDetailView({
                         </div>
                         {(p.status === 'PENDENTE' || p.status === 'ATRASADO' || p.status === 'NEGOCIADO') && (
                           <button onClick={() => onMarkPaid(p.id)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-2 py-1.5 rounded text-[10px] transition cursor-pointer">Marcar como Pago</button>
+                        )}
+                        {p.status === 'PAGO' && onUndoMarkPaid && (
+                          <button onClick={() => onUndoMarkPaid(p.id)} className="bg-gray-400 hover:bg-gray-500 text-white font-semibold px-2 py-1.5 rounded text-[10px] transition cursor-pointer">Desfazer Pagamento</button>
                         )}
                       </div>
                     </div>
