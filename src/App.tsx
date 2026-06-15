@@ -1310,7 +1310,7 @@ export default function App() {
               onUpdateAluno={handleUpdateAluno}
               onDeleteAluno={handleDeleteAluno}
               onToggleCobrancaAutomatica={handleToggleCobrancaAutomatica}
-              onSendCustomWhatsApp={handleSendCustomWhatsApp}
+              onSendCustomWhatsApp={(alunoId, txt) => handleSendMessage(alunoId, txt, 'HUMANO_AGENTE')}
               onMarkPaid={handleMarkParcelaPaid}
               onUndoMarkPaid={handleUndoParcelaPaid}
               onSimulateDeal={handleSimulateDeal}
