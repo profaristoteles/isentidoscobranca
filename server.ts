@@ -683,18 +683,18 @@ async function runScheduledDispatch(): Promise<void> {
               to: aluno.email,
               subject: `Aviso: ${regra.titulo} (Instituto Sentidos)`,
               text: texto.replace(/<[^>]*>/g, ''),
-              html: \`<p style="white-space: pre-wrap; font-family: sans-serif;">\${texto}</p>\`
+              html: `<p style="white-space: pre-wrap; font-family: sans-serif;">${texto}</p>`
             });
             enviouNesteCiclo = true;
           } catch (err: any) {
-            erros.push(\`\${aluno.nome} (E-mail): \${err.message}\`);
+            erros.push(`${aluno.nome} (E-mail): ${err.message}`);
           }
         }
 
         // Envio de WhatsApp
         if (canal === 'WHATSAPP' || canal === 'AMBOS') {
           try {
-            const resp = await fetch(\`\${apiBase}/message/sendText/\${instanceName}\`, {
+            const resp = await fetch(`${apiBase}/message/sendText/${instanceName}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
               body: JSON.stringify({ number: phone, text: texto, delay: 1200, linkPreview: false })
@@ -702,10 +702,10 @@ async function runScheduledDispatch(): Promise<void> {
             if (resp.ok) {
               enviouNesteCiclo = true;
             } else {
-              erros.push(\`\${aluno.nome} (WhatsApp): HTTP \${resp.status}\`);
+              erros.push(`${aluno.nome} (WhatsApp): HTTP ${resp.status}`);
             }
           } catch (err: any) {
-            erros.push(\`\${aluno.nome} (WhatsApp): \${err.message}\`);
+            erros.push(`${aluno.nome} (WhatsApp): ${err.message}`);
           }
         }
 
