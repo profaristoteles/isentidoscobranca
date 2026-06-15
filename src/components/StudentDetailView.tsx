@@ -22,8 +22,8 @@ interface StudentDetailViewProps {
   onSendCustomWhatsApp: (alunoId: string, text: string) => void;
   onMarkPaid: (parcelaId: string) => void;
   onUndoMarkPaid?: (parcelaId: string) => void;
-  onSimulateDeal: (alunoId: string, parcelas: number, valorTotal: number) => void;
   onToggleCobrancaAutomatica: (alunoId: string) => void;
+  onEditStudent?: (alunoId: string) => void;
 }
 
 const STATUS_STYLE: Record<StatusParcela, string> = {
@@ -45,7 +45,8 @@ export default function StudentDetailView({
   onMarkPaid,
   onUndoMarkPaid,
   onSimulateDeal,
-  onToggleCobrancaAutomatica
+  onToggleCobrancaAutomatica,
+  onEditStudent
 }: StudentDetailViewProps) {
   const [customMsg, setCustomMsg] = useState('');
   const [isNegotiating, setIsNegotiating] = useState(false);
@@ -90,11 +91,26 @@ export default function StudentDetailView({
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-100 shadow-3xs">
-        <button onClick={onBack} className="flex items-center gap-2 text-xs font-semibold text-[#03045e] hover:opacity-85 transition cursor-pointer">
-          <ArrowLeft className="h-4 w-4" />
-          <span>Voltar para Lista de Alunos</span>
-        </button>
-        <span className="text-xs text-gray-400">ID Acadêmico: <strong className="font-mono text-gray-700">{student.id}</strong></span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+            <button 
+              onClick={onBack}
+              className="flex items-center text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar à lista
+            </button>
+            {onEditStudent && (
+              <button
+                onClick={() => onEditStudent(student.id)}
+                className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
+              >
+                <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Editar Aluno
+              </button>
+            )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
