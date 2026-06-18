@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { GraduationCap, ShieldAlert, ArrowRight, Loader } from 'lucide-react';
 import { safeSetItem } from '../utils/storage';
 
+
 interface LoginScreenProps {
   onLoginSuccess: (email: string) => void;
   appName: string;
 }
 
 export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProps) {
-  const [email, setEmail] = useState('isentidosedu@gmail.com');
-  const [password, setPassword] = useState('sentidos123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -133,9 +134,6 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
                   placeholder="Chave de acesso corporativa"
                 />
               </div>
-              <p className="mt-2 text-[10px] text-gray-400 leading-normal">
-                Dica Avaliação: Use a senha <strong className="font-mono text-[#ff8000] text-xs bg-white/5 px-1.5 py-0.5 rounded border border-white/5">sentidos123</strong>
-              </p>
             </div>
 
             {/* Remember and Forgot */}
@@ -185,21 +183,6 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
               </button>
             </div>
           </form>
-
-          {/* Quick Demo Credentials trigger block */}
-          <div className="mt-6 pt-5 border-t border-white/10 text-center">
-            <span className="text-[10px] text-gray-400 font-bold uppercase block mb-3 tracking-wider">Acesso Rápido de Demonstração</span>
-            <button
-              onClick={() => {
-                setEmail('isentidosedu@gmail.com');
-                setPassword('sentidos123');
-                onLoginSuccess('isentidosedu@gmail.com');
-              }}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 text-orange-400 hover:text-orange-300 font-bold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 w-full hover:scale-[1.01] active:scale-[0.99] duration-300"
-            >
-              <span>Acessar como Financeiro FAEPI</span>
-            </button>
-          </div>
 
         </div>
       </div>
