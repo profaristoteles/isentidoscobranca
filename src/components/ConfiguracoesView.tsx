@@ -191,6 +191,7 @@ export default function ConfiguracoesView({
     });
 
     onUpdateGlobalSettings({
+      ...globalSettings,
       teamPhoneNumber: teamPhone,
       dispatchMinIntervalSec: Number(dispatchMinInterval),
       dispatchMaxIntervalSec: Number(dispatchMaxInterval),
@@ -1274,6 +1275,7 @@ export default function ConfiguracoesView({
                         safeSetItem('sentidos_evolution_instance', evolutionInstance.trim());
                         safeSetItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
                         onUpdateGlobalSettings({
+                          ...globalSettings,
                           teamPhoneNumber: globalSettings?.teamPhoneNumber ?? '',
                           dispatchMinIntervalSec: globalSettings?.dispatchMinIntervalSec ?? 15,
                           dispatchMaxIntervalSec: globalSettings?.dispatchMaxIntervalSec ?? 45,

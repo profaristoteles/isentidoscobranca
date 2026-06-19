@@ -148,7 +148,13 @@ export default function App() {
     return safeParseJson(safeGetItem('sentidos_globalSettings'), {
       teamPhoneNumber: '',
       dispatchMinIntervalSec: 15,
-      dispatchMaxIntervalSec: 45
+      dispatchMaxIntervalSec: 45,
+      evolutionConfig: {
+        url: safeGetItem('sentidos_evolution_url') || '',
+        instanceName: safeGetItem('sentidos_evolution_instance') || '',
+        instanceToken: safeGetItem('sentidos_evolution_instance_token') || '',
+        globalToken: safeGetItem('sentidos_evolution_global_token') || ''
+      }
     });
   });
 
