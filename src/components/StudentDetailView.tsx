@@ -64,8 +64,8 @@ export default function StudentDetailView({
 
   const emAberto = studentParcelas.filter(p => p.status === 'PENDENTE' || p.status === 'ATRASADO' || p.status === 'NEGOCIADO');
   const restantesContrato = Math.max(0, (student.totalParcelas ?? 0) - (student.parcelasPagas ?? 0));
-  // Prefere o contrato financeiro; recorre aos registros reais se o contrato for 0.
-  const restantes = restantesContrato > 0 ? restantesContrato : emAberto.length;
+  // Usa o contrato financeiro se não houver parcelas geradas; do contrário, confia nos registros reais.
+  const restantes = studentParcelas.length > 0 ? emAberto.length : restantesContrato;
 
   const getStatusLabelAndStyle = (status: Aluno['statusFinanceiro']) => {
     switch (status) {

@@ -427,12 +427,13 @@ export default function App() {
         // usa o contrato financeiro para não subestimar o débito.
         const restantesContrato = Math.max(0, (student.totalParcelas ?? 0) - (student.parcelasPagas ?? 0));
         const valorContrato = restantesContrato * (student.valorMensalidade ?? 0);
-        const effectivePendingSum = (restantesContrato > emAberto.length && valorContrato > pendingSum)
-          ? valorContrato
-          : pendingSum;
+        
+        const effectivePendingSum = studentParcelas.length > 0 
+          ? pendingSum 
+          : valorContrato;
 
         let financialStatus: Aluno['statusFinanceiro'] = 'EM_DIA';
-        if (restantesContrato > 0 || emAberto.length > 0) {
+        if ((studentParcelas.length === 0 && restantesContrato > 0) || emAberto.length > 0) {
           const hasOverdue = emAberto.some(p => p.status === 'ATRASADO');
           financialStatus = hasOverdue ? 'INADIMPLENTE' : 'PENDENTE';
         }
