@@ -476,6 +476,8 @@ export default function App() {
     const wasNegotiated = target.status === 'NEGOCIADO';
 
     updateParcela(parcelaId, { status: 'PAGO', dataPagamento: new Date().toLocaleDateString('pt-BR') });
+    setAlunos(prev => prev.map(a => a.id === target.alunoId ? { ...a, parcelasPagas: (a.parcelasPagas || 0) + 1 } : a));
+
     logParcelaHistorico(parcelaId, target.alunoId, 'Pagamento registrado',
       `Parcela ${formatParcela(target)} quitada (R$ ${target.valorAtual.toFixed(2)})${wasNegotiated ? ' — recuperada via negociação' : ''}`);
 
@@ -508,6 +510,8 @@ export default function App() {
     const expectedStatus = getStatusEfetivo(emAbertoSimulado);
 
     updateParcela(parcelaId, { status: expectedStatus, dataPagamento: undefined });
+    setAlunos(prev => prev.map(a => a.id === target.alunoId ? { ...a, parcelasPagas: Math.max(0, (a.parcelasPagas || 0) - 1) } : a));
+
     logParcelaHistorico(parcelaId, target.alunoId, 'Pagamento Desfeito',
       `Pagamento da parcela ${formatParcela(target)} foi desfeito. Status revertido para ${expectedStatus}.`);
 
