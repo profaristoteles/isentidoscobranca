@@ -648,11 +648,12 @@ async function runScheduledDispatch(): Promise<void> {
         const vencDate = parseDateBR(parcela.vencimento);
         if (!vencDate) continue;
         const diffDias = Math.round((vencDate.getTime() - today.getTime()) / 86400000);
+        const absDias = Math.abs(Number(regra.diasGatilho));
 
         let matches = false;
-        if (regra.tipoGatilho === 'ANTES' && diffDias === Number(regra.diasGatilho)) matches = true;
+        if (regra.tipoGatilho === 'ANTES' && diffDias === absDias) matches = true;
         if (regra.tipoGatilho === 'DIA_VENCIMENTO' && diffDias === 0) matches = true;
-        if (regra.tipoGatilho === 'DEPOIS' && diffDias === -Math.abs(Number(regra.diasGatilho))) matches = true;
+        if (regra.tipoGatilho === 'DEPOIS' && diffDias === -absDias) matches = true;
         if (!matches) continue;
 
         // Anti-duplicidade: não enviar mais de uma vez por dia para a mesma parcela
