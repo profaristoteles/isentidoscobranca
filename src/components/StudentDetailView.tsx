@@ -22,6 +22,7 @@ interface StudentDetailViewProps {
   onSendCustomWhatsApp: (alunoId: string, text: string) => void;
   onMarkPaid: (parcelaId: string) => void;
   onUndoMarkPaid?: (parcelaId: string) => void;
+  onSimulateDeal: (alunoId: string, totalParcelas: number, totalValor: number) => void;
   onToggleCobrancaAutomatica: (alunoId: string) => void;
   onEditStudent?: (alunoId: string) => void;
   onRecalculateParcelas?: (alunoId: string) => void;

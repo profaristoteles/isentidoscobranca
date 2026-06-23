@@ -17,7 +17,7 @@ import {
   Pencil,
   GraduationCap
 } from 'lucide-react';
-import { Aluno } from '../types';
+import { Aluno, Parcela, ParcelaHistorico, WhatsAppMensagem } from '../types';
 
 interface StudentsViewProps {
   alunos: Aluno[];
@@ -32,6 +32,15 @@ interface StudentsViewProps {
   onRecalculateParcelas?: (alunoId: string) => void;
   editStudentRequestedId?: string | null;
   onEditHandled?: () => void;
+  
+  // Extra props passed from App.tsx
+  parcelas?: Parcela[];
+  parcelaHistorico?: ParcelaHistorico[];
+  mensagens?: WhatsAppMensagem[];
+  onSendCustomWhatsApp?: (alunoId: string, text: string) => void;
+  onMarkPaid?: (parcelaId: string) => void;
+  onUndoMarkPaid?: (parcelaId: string) => void;
+  onSimulateDeal?: (alunoId: string, totalParcelas: number, totalValor: number) => void;
 }
 
 export default function StudentsView({ 

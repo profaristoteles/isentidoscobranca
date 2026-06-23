@@ -149,6 +149,11 @@ export default function App() {
       teamPhoneNumber: '',
       dispatchMinIntervalSec: 15,
       dispatchMaxIntervalSec: 45,
+      scheduledDispatch: {
+        enabled: false,
+        horario: '09:00',
+        diasSemana: [1, 2, 3, 4, 5]
+      },
       evolutionConfig: {
         url: safeGetItem('sentidos_evolution_url') || '',
         instanceName: safeGetItem('sentidos_evolution_instance') || '',
@@ -201,6 +206,31 @@ export default function App() {
     });
   };
 
+  const setGlobalSettingsMerged = (backendSettings: any) => {
+    setGlobalSettings(prev => {
+      const merged = {
+        ...prev,
+        ...backendSettings,
+        evolutionConfig: {
+          url: backendSettings.evolutionConfig?.url || prev.evolutionConfig?.url || '',
+          instanceName: backendSettings.evolutionConfig?.instanceName || prev.evolutionConfig?.instanceName || '',
+          instanceToken: backendSettings.evolutionConfig?.instanceToken || prev.evolutionConfig?.instanceToken || '',
+          globalToken: backendSettings.evolutionConfig?.globalToken || prev.evolutionConfig?.globalToken || ''
+        },
+        scheduledDispatch: backendSettings.scheduledDispatch || prev.scheduledDispatch || {
+          enabled: false,
+          horario: '09:00',
+          diasSemana: [1, 2, 3, 4, 5]
+        }
+      };
+      if (isSameJson(prev, merged)) {
+        return prev;
+      }
+      skipSyncRef.current = true;
+      return merged;
+    });
+  };
+
   // Initial Fetch from backend DB with LocalStorage fallback
   useEffect(() => {
     const fetchDB = async () => {
@@ -219,7 +249,7 @@ export default function App() {
           if (data.cursos) setIfChanged(setCursos, data.cursos);
           if (data.users) setIfChanged(setUsers, data.users);
           if (data.smtpConfig) setIfChanged(setSmtpConfig, data.smtpConfig);
-          if (data.globalSettings) setIfChanged(setGlobalSettings, data.globalSettings);
+          if (data.globalSettings) setGlobalSettingsMerged(data.globalSettings);
 
           setIsUsingApi(true);
           console.log('[Sentidos Cobranças] Banco de dados carregado com sucesso do backend.');
@@ -284,7 +314,7 @@ export default function App() {
           if (data.cursos) setIfChanged(setCursos, data.cursos);
           if (data.users) setIfChanged(setUsers, data.users);
           if (data.smtpConfig) setIfChanged(setSmtpConfig, data.smtpConfig);
-          if (data.globalSettings) setIfChanged(setGlobalSettings, data.globalSettings);
+          if (data.globalSettings && currentTab !== 'configurações') setGlobalSettingsMerged(data.globalSettings);
         }
       } catch (err) {
         console.warn('[Sentidos Cobranças] Erro ao buscar atualizações em segundo plano:', err);
@@ -293,7 +323,7 @@ export default function App() {
 
     const interval = setInterval(pollUpdates, 5000);
     return () => clearInterval(interval);
-  }, [isUsingApi]);
+  }, [isUsingApi, currentTab]);
 
   // Sync to Backend JSON DB
   useEffect(() => {

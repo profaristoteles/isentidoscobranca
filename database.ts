@@ -203,9 +203,34 @@ function readDBJson(): DbData {
     }
     if (!parsed.globalSettings) {
       parsed.globalSettings = {
-        teamPhoneNumber: ''
+        teamPhoneNumber: '',
+        dispatchMinIntervalSec: 15,
+        dispatchMaxIntervalSec: 45,
+        scheduledDispatch: { enabled: false, horario: '09:00', diasSemana: [1,2,3,4,5] },
+        evolutionConfig: { url: '', instanceName: '', instanceToken: '', globalToken: '' }
       };
       updated = true;
+    } else {
+      let gsUpdated = false;
+      if (parsed.globalSettings.dispatchMinIntervalSec === undefined) {
+        parsed.globalSettings.dispatchMinIntervalSec = 15;
+        gsUpdated = true;
+      }
+      if (parsed.globalSettings.dispatchMaxIntervalSec === undefined) {
+        parsed.globalSettings.dispatchMaxIntervalSec = 45;
+        gsUpdated = true;
+      }
+      if (!parsed.globalSettings.scheduledDispatch) {
+        parsed.globalSettings.scheduledDispatch = { enabled: false, horario: '09:00', diasSemana: [1,2,3,4,5] };
+        gsUpdated = true;
+      }
+      if (!parsed.globalSettings.evolutionConfig) {
+        parsed.globalSettings.evolutionConfig = { url: '', instanceName: '', instanceToken: '', globalToken: '' };
+        gsUpdated = true;
+      }
+      if (gsUpdated) {
+        updated = true;
+      }
     }
     if (!parsed.parcelaHistorico) {
       parsed.parcelaHistorico = [];
