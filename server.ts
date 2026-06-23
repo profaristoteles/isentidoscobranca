@@ -607,16 +607,19 @@ async function runScheduledDispatch(): Promise<void> {
     const currentTime = `${hh}:${mm}`;
     const currentDay = brazilNow.getUTCDay(); // 0=Dom
 
-    if (currentTime !== sd.horario) return;
+    // Filtra apenas as regras ativas que correspondem ao horário de disparo atual
+    const rulesToRun = db.regras.filter((r: any) => r.ativo && r.horarioEnvio === currentTime);
+    if (rulesToRun.length === 0) return;
+
     if (!(sd.diasSemana as number[]).includes(currentDay)) return;
 
     // Evita duplo disparo na mesma janela de 1 minuto
     if (sd.ultimoDisparo) {
-      const minutosSinceLastRun = (nowUtc.getTime() - new Date(sd.ultimoDisparo).getTime()) / 60000;
-      if (minutosSinceLastRun < 5) return;
+      const diffSeconds = (nowUtc.getTime() - new Date(sd.ultimoDisparo).getTime()) / 1000;
+      if (diffSeconds < 45) return;
     }
 
-    console.log(`[Agendador] Iniciando disparo agendado às ${currentTime} (horário de Brasília)...`);
+    console.log(`[Agendador] Iniciando disparo agendado às ${currentTime} (horário de Brasília) para ${rulesToRun.length} regra(s)...`);
 
     const today = new Date(
       brazilNow.getUTCFullYear(),
@@ -632,7 +635,7 @@ async function runScheduledDispatch(): Promise<void> {
     const erros: string[] = [];
     const dbParcelas: any[] = db.parcelas;
 
-    for (const regra of db.regras) {
+    for (const regra of rulesToRun) {
       if (!regra.ativo) continue;
       const canal = regra.canal || 'WHATSAPP';
       if (canal !== 'WHATSAPP' && canal !== 'EMAIL' && canal !== 'AMBOS') continue;
