@@ -135,6 +135,12 @@ export default function ConfiguracoesView({
       setSchedEnabled(globalSettings.scheduledDispatch?.enabled ?? false);
       setSchedHorario(globalSettings.scheduledDispatch?.horario ?? '09:00');
       setSchedDias(globalSettings.scheduledDispatch?.diasSemana ?? [1,2,3,4,5]);
+      if (globalSettings.evolutionConfig) {
+        setEvolutionUrl(globalSettings.evolutionConfig.url || '');
+        setEvolutionGlobalToken(globalSettings.evolutionConfig.globalToken || '');
+        setEvolutionInstance(globalSettings.evolutionConfig.instanceName || '');
+        setEvolutionInstanceToken(globalSettings.evolutionConfig.instanceToken || '');
+      }
     }
   }, [globalSettings]);
 
@@ -232,16 +238,16 @@ export default function ConfiguracoesView({
   });
 
   const [evolutionUrl, setEvolutionUrl] = useState(() => {
-    return safeGetItem('sentidos_evolution_url') || '';
+    return globalSettings?.evolutionConfig?.url || safeGetItem('sentidos_evolution_url') || '';
   });
   const [evolutionGlobalToken, setEvolutionGlobalToken] = useState(() => {
-    return safeGetItem('sentidos_evolution_global_token') || '';
+    return globalSettings?.evolutionConfig?.globalToken || safeGetItem('sentidos_evolution_global_token') || '';
   });
   const [evolutionInstance, setEvolutionInstance] = useState(() => {
-    return safeGetItem('sentidos_evolution_instance') || '';
+    return globalSettings?.evolutionConfig?.instanceName || safeGetItem('sentidos_evolution_instance') || '';
   });
   const [evolutionInstanceToken, setEvolutionInstanceToken] = useState(() => {
-    return safeGetItem('sentidos_evolution_instance_token') || '';
+    return globalSettings?.evolutionConfig?.instanceToken || safeGetItem('sentidos_evolution_instance_token') || '';
   });
   const [checkingConnection, setCheckingConnection] = useState(false);
 

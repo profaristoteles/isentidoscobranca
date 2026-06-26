@@ -200,7 +200,7 @@ export default function App() {
   }, [selectedStudentId]);
 
   // Ref to prevent sync loop when polling updates from backend
-  const skipSyncRef = useRef(false);
+  const isPollingRef = useRef(false);
   const pendingSyncRef = useRef(false);
   const isResettingRef = useRef(false);
   const hasAutoFixedParcelasRef = useRef(false);
@@ -210,7 +210,6 @@ export default function App() {
       if (isSameJson(prev, nextValue)) {
         return prev;
       }
-      skipSyncRef.current = true;
       return nextValue;
     });
   };
@@ -235,7 +234,12 @@ export default function App() {
       if (isSameJson(prev, merged)) {
         return prev;
       }
-      skipSyncRef.current = true;
+      const dbUrl = backendSettings.evolutionConfig?.url || '';
+      const mergedUrl = merged.evolutionConfig?.url || '';
+      if (!dbUrl && mergedUrl) {
+        console.log('[Sentidos] Merged evolution config from localStorage. Forcing sync to database...');
+        isPollingRef.current = false;
+      }
       return merged;
     });
   };
@@ -247,6 +251,7 @@ export default function App() {
         const response = await fetch('/api/db');
         if (response.ok) {
           const data = await response.json();
+          isPollingRef.current = true;
           if (data.alunos) setIfChanged(setAlunos, data.alunos);
           if (data.parcelas) setIfChanged(setParcelas, data.parcelas);
           if (data.parcelaHistorico) setIfChanged(setParcelaHistorico, data.parcelaHistorico);
@@ -262,6 +267,9 @@ export default function App() {
 
           setIsUsingApi(true);
           console.log('[Sentidos Cobranças] Banco de dados carregado com sucesso do backend.');
+          setTimeout(() => {
+            isPollingRef.current = false;
+          }, 100);
         } else {
           console.warn('[Sentidos Cobranças] Servidor de backend retornou erro. Usando localStorage.');
         }
@@ -312,6 +320,7 @@ export default function App() {
           if (isResettingRef.current) return;
 
           const data = await response.json();
+          isPollingRef.current = true;
           if (data.alunos) setIfChanged(setAlunos, data.alunos);
           if (data.parcelas) setIfChanged(setParcelas, data.parcelas);
           if (data.parcelaHistorico) setIfChanged(setParcelaHistorico, data.parcelaHistorico);
@@ -324,6 +333,9 @@ export default function App() {
           if (data.users) setIfChanged(setUsers, data.users);
           if (data.smtpConfig) setIfChanged(setSmtpConfig, data.smtpConfig);
           if (data.globalSettings && currentTab !== 'configurações') setGlobalSettingsMerged(data.globalSettings);
+          setTimeout(() => {
+            isPollingRef.current = false;
+          }, 100);
         }
       } catch (err) {
         console.warn('[Sentidos Cobranças] Erro ao buscar atualizações em segundo plano:', err);
@@ -339,8 +351,7 @@ export default function App() {
     if (!dbLoaded || !isUsingApi) return;
     if (isResettingRef.current) return;
 
-    if (skipSyncRef.current) {
-      skipSyncRef.current = false;
+    if (isPollingRef.current) {
       return;
     }
 
