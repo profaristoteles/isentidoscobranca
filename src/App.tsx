@@ -93,7 +93,7 @@ const buildCobrancaText = (template: string, aluno: Aluno, parcela: Parcela) => 
 export default function App() {
   // Session User State
   const [userEmail, setUserEmail] = useState<string | null>(() => {
-    return safeGetItem('sentidos_user_email');
+    return safeGetItem('sentidos_auth_token') ? safeGetItem('sentidos_user_email') : null;
   });
   const [currentTab, setCurrentTab] = useState<string>(() => {
     return safeGetItem('sentidos_current_tab') || 'dashboard';
@@ -1440,6 +1440,7 @@ export default function App() {
               onSetWhatsappOnline={setWhatsappOnline}
               onPostAlert={postToastAlert}
               onSetTab={setCurrentTab}
+              globalSettings={globalSettings}
             />
           </div>
         );

@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import { readDB, writeDB, initDb, getInitialData, backupDatabaseFile } from './database';
@@ -13,6 +14,80 @@ const PORT = 3001;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+type SessionData = {
+  email: string;
+  name?: string;
+  role?: string;
+  expiresAt: number;
+};
+
+type BulkJob = {
+  id: string;
+  status: 'RUNNING' | 'DONE' | 'ERROR';
+  total: number;
+  sent: number;
+  failed: number;
+  current?: string;
+  startedAt: string;
+  finishedAt?: string;
+  message: string;
+  errors: string[];
+};
+
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const sessions = new Map<string, SessionData>();
+const bulkJobs = new Map<string, BulkJob>();
+
+const hashPassword = (password: string): string => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const iterations = 120000;
+  const hash = crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('hex');
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
+};
+
+const verifyPassword = (password: string, stored?: string): boolean => {
+  if (!stored) return false;
+  if (!stored.startsWith('pbkdf2$')) {
+    return stored === password;
+  }
+  const [, iterationsRaw, salt, expected] = stored.split('$');
+  const iterations = Number(iterationsRaw);
+  if (!iterations || !salt || !expected) return false;
+  const actual = crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('hex');
+  if (actual.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+};
+
+const createSession = (user: any): string => {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, {
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    expiresAt: Date.now() + SESSION_TTL_MS
+  });
+  return token;
+};
+
+const publicApiPaths = new Set(['/api/login', '/api/status', '/api/whatsapp/webhook']);
+
+const requireAuth: express.RequestHandler = (req, res, next) => {
+  const originalPath = req.originalUrl.split('?')[0];
+  if (publicApiPaths.has(originalPath)) {
+    return next();
+  }
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  const session = token ? sessions.get(token) : null;
+  if (!session || session.expiresAt < Date.now()) {
+    if (token) sessions.delete(token);
+    return res.status(401).json({ success: false, message: 'SessÃ£o invÃ¡lida ou expirada. Faça login novamente.' });
+  }
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
+  (req as any).user = session;
+  next();
+};
 
 // Helper functions to parse and match phone numbers
 const cleanNumber = (numStr: string): string => {
@@ -30,6 +105,78 @@ const numbersMatch = (num1: string, num2: string): boolean => {
   return c1.substring(c1.length - len) === c2.substring(c2.length - len);
 };
 
+function sanitizePhoneNumber(numStr: string): string {
+  const cleaned = (numStr || '').replace(/\D/g, '');
+  if (cleaned.length >= 10 && cleaned.length <= 11 && !cleaned.startsWith('55')) {
+    return '55' + cleaned;
+  }
+  return cleaned;
+}
+
+function randomDelayMs(minSec: number, maxSec: number): number {
+  const min = Math.max(5, Number(minSec) || 15);
+  const max = Math.max(min, Number(maxSec) || min);
+  return Math.floor(Math.random() * ((max - min) * 1000 + 1)) + min * 1000;
+}
+
+function getEvolutionConfig(db: any) {
+  const evo = db.globalSettings?.evolutionConfig || {};
+  const apiKey = String(evo.instanceToken || evo.globalToken || '').trim();
+  const apiBase = String(evo.url || '').replace(/\/$/, '');
+  const instanceName = String(evo.instanceName || '').trim();
+  if (!apiBase || !instanceName || !apiKey) {
+    throw new Error('Evolution API nÃ£o configurada. Informe URL, instÃ¢ncia e token em ConfiguraÃ§Ãµes.');
+  }
+  return { apiBase, instanceName, apiKey };
+}
+
+async function sendEvolutionText(db: any, numberStr: string, text: string): Promise<any> {
+  const { apiBase, instanceName, apiKey } = getEvolutionConfig(db);
+  const number = sanitizePhoneNumber(numberStr);
+  if (!number) {
+    throw new Error('NÃºmero de WhatsApp invÃ¡lido.');
+  }
+  const resp = await fetch(`${apiBase}/message/sendText/${encodeURIComponent(instanceName)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+    body: JSON.stringify({ number, text, delay: 1200, linkPreview: false })
+  });
+  const contentType = resp.headers.get('content-type') || '';
+  const payload = contentType.includes('application/json') ? await resp.json().catch(() => ({})) : await resp.text().catch(() => '');
+  if (!resp.ok) {
+    const detail = typeof payload === 'string' ? payload : payload?.message || payload?.error || JSON.stringify(payload);
+    throw new Error(`Evolution API HTTP ${resp.status}${detail ? `: ${detail}` : ''}`);
+  }
+  return payload;
+}
+
+function findTemplateParcela(db: any, alunoId: string) {
+  const parcelas = (db.parcelas || [])
+    .filter((p: any) => p.alunoId === alunoId)
+    .sort((a: any, b: any) => Number(a.numeroParcela || 0) - Number(b.numeroParcela || 0));
+  return parcelas.find((p: any) => p.status === 'ATRASADO')
+    || parcelas.find((p: any) => p.status === 'PENDENTE')
+    || parcelas[0]
+    || null;
+}
+
+function buildStudentMessage(template: string, aluno: any, parcela: any | null): string {
+  if (!parcela) {
+    return template
+      .replace(/{nome_aluno}/g, aluno.nome || '')
+      .replace(/{curso}/g, aluno.curso || '')
+      .replace(/{valor_boleto}/g, `R$ ${Number(aluno.valorMensalidade || aluno.valorPendente || 0).toFixed(2)}`)
+      .replace(/{valor}/g, `R$ ${Number(aluno.valorMensalidade || aluno.valorPendente || 0).toFixed(2)}`)
+      .replace(/{vencimento_boleto}/g, aluno.primeiroVencimentoEmAberto || '')
+      .replace(/{vencimento}/g, aluno.primeiroVencimentoEmAberto || '')
+      .replace(/{parcela}/g, '')
+      .replace(/{linha_digitavel}/g, '')
+      .replace(/{competencia}/g, '')
+      .replace(/{link_pdf}/g, '');
+  }
+  return buildMsgScheduler(template, aluno, parcela);
+}
+
 // Login verification
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
@@ -39,23 +186,22 @@ app.post('/api/login', async (req, res) => {
 
   try {
     const db = await readDB();
-    const matchedUser = db.users?.find((u: any) => u.email === email && u.password === password);
+    const matchedUser = db.users?.find((u: any) => u.email === email && verifyPassword(password, u.password));
 
     if (matchedUser) {
+      if (matchedUser.active === false) {
+        return res.status(403).json({ success: false, message: 'UsuÃ¡rio inativo.' });
+      }
+      if (!String(matchedUser.password || '').startsWith('pbkdf2$')) {
+        matchedUser.password = hashPassword(password);
+        await writeDB(db);
+      }
+      const token = createSession(matchedUser);
       return res.json({ 
         success: true, 
         message: 'Autenticado com sucesso!', 
         user: { email: matchedUser.email, name: matchedUser.name, role: matchedUser.role },
-        token: `demo-token-${Date.now()}`
-      });
-    }
-
-    if (email === 'isentidosedu@gmail.com' && password === 'sentidos123') {
-      return res.json({ 
-        success: true, 
-        message: 'Autenticado com sucesso!', 
-        user: { email, role: 'Administrador' },
-        token: `demo-token-${Date.now()}`
+        token
       });
     }
 
@@ -65,6 +211,8 @@ app.post('/api/login', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Erro interno ao autenticar usuário.' });
   }
 });
+
+app.use('/api', requireAuth);
 
 // Status / Health check
 app.get('/api/status', async (req, res) => {
@@ -404,8 +552,19 @@ app.post('/api/whatsapp/proxy', async (req, res) => {
   }
 
   try {
+    const db = await readDB();
+    const { apiBase } = getEvolutionConfig(db);
+    const requested = new URL(url);
+    const allowed = new URL(apiBase);
+    if (requested.origin !== allowed.origin) {
+      return res.status(403).json({ success: false, message: 'Proxy bloqueado: URL fora da Evolution API configurada.' });
+    }
+    const safeMethod = String(method || 'GET').toUpperCase();
+    if (!['GET', 'POST', 'DELETE'].includes(safeMethod)) {
+      return res.status(405).json({ success: false, message: 'Metodo nao permitido no proxy.' });
+    }
     const fetchResponse = await fetch(url, {
-      method: method || 'GET',
+      method: safeMethod,
       headers: headers || {},
       body: body ? JSON.stringify(body) : undefined
     });
@@ -425,6 +584,152 @@ app.post('/api/whatsapp/proxy', async (req, res) => {
     console.error('Error in WhatsApp proxy endpoint:', error);
     res.status(500).json({ success: false, message: error.message || 'Erro de comunicação com a Evolution API.' });
   }
+});
+
+app.post('/api/whatsapp/send-text', async (req, res) => {
+  const { number, text } = req.body;
+  if (!number || !text) {
+    return res.status(400).json({ success: false, message: 'Numero e texto sao obrigatorios.' });
+  }
+  try {
+    const db = await readDB();
+    const result = await sendEvolutionText(db, number, text);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message || 'Falha ao enviar WhatsApp.' });
+  }
+});
+
+app.post('/api/whatsapp/test-connection', async (req, res) => {
+  const { url, instanceName, instanceToken, globalToken } = req.body;
+  if (!url || !instanceName) {
+    return res.status(400).json({ success: false, message: 'URL e instancia sao obrigatorias.' });
+  }
+  try {
+    const baseUrl = String(url).replace(/\/$/, '');
+    const parsed = new URL(baseUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ success: false, message: 'URL da Evolution API invalida.' });
+    }
+    const apiKey = String(instanceToken || globalToken || '').trim();
+    const response = await fetch(`${baseUrl}/instance/connectionState/${encodeURIComponent(String(instanceName))}`, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, state: 'ERROR', details: data, message: data?.message || `HTTP ${response.status}` });
+    }
+    const state = data?.instance?.state || data?.state || 'close';
+    res.json({ success: true, connected: state === 'open', state, details: data });
+  } catch (err: any) {
+    res.status(500).json({ success: false, state: 'OFFLINE', message: err.message || 'Falha ao testar Evolution API.' });
+  }
+});
+
+app.post('/api/whatsapp/bulk', async (req, res) => {
+  const { alunoIds, text, minIntervalSec, maxIntervalSec, respectCobrancaAutomatica = true } = req.body;
+  if (!Array.isArray(alunoIds) || alunoIds.length === 0 || !text || typeof text !== 'string') {
+    return res.status(400).json({ success: false, message: 'Informe alunos e mensagem para o disparo em massa.' });
+  }
+
+  const jobId = `bulk-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const job: BulkJob = {
+    id: jobId,
+    status: 'RUNNING',
+    total: alunoIds.length,
+    sent: 0,
+    failed: 0,
+    startedAt: new Date().toISOString(),
+    message: 'Disparo em massa iniciado.',
+    errors: []
+  };
+  bulkJobs.set(jobId, job);
+  res.json({ success: true, jobId });
+
+  void (async () => {
+    try {
+      const db = await readDB();
+      getEvolutionConfig(db);
+      const minSec = Number(minIntervalSec ?? db.globalSettings?.dispatchMinIntervalSec ?? 15);
+      const maxSec = Number(maxIntervalSec ?? db.globalSettings?.dispatchMaxIntervalSec ?? 45);
+      const ids = Array.from(new Set(alunoIds.map((id: any) => String(id))));
+
+      for (let i = 0; i < ids.length; i++) {
+        const aluno = db.alunos.find((a: any) => a.id === ids[i]);
+        if (!aluno) {
+          job.failed++;
+          job.errors.push(`Aluno ${ids[i]} nao encontrado.`);
+          continue;
+        }
+        if (respectCobrancaAutomatica && aluno.cobrancaAutomatica === false) {
+          job.failed++;
+          job.errors.push(`${aluno.nome}: cobranca automatica desativada.`);
+          continue;
+        }
+        job.current = aluno.nome;
+        try {
+          const parcela = findTemplateParcela(db, aluno.id);
+          const rendered = buildStudentMessage(text, aluno, parcela);
+          await sendEvolutionText(db, aluno.whatsapp, rendered);
+          const now = new Date().toISOString();
+          db.mensagens.push({
+            id: `msg-${Date.now()}-${i}`,
+            alunoId: aluno.id,
+            tipo: 'HUMANO_AGENTE',
+            texto: rendered,
+            dataHora: now,
+            statusEnvio: 'ENTREGUE'
+          });
+          db.logs.unshift({
+            id: `log-${Date.now()}-${i}`,
+            timestamp: now.replace('T', ' ').substring(0, 19),
+            tipo: 'WHATSAPP',
+            usuario: 'Disparo em Massa',
+            detalhe: `Mensagem em massa enviada para ${aluno.nome}.`,
+            sucesso: true
+          });
+          job.sent++;
+        } catch (err: any) {
+          job.failed++;
+          job.errors.push(`${aluno.nome}: ${err.message || err}`);
+        }
+        if (i < ids.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, randomDelayMs(minSec, maxSec)));
+        }
+      }
+
+      db.logs.unshift({
+        id: `log-${Date.now()}-bulk`,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        tipo: 'WHATSAPP',
+        usuario: 'Disparo em Massa',
+        detalhe: `Disparo em massa finalizado: ${job.sent} enviado(s), ${job.failed} falha(s).`,
+        sucesso: job.failed === 0
+      });
+      await writeDB(db);
+      job.status = 'DONE';
+      job.current = undefined;
+      job.finishedAt = new Date().toISOString();
+      job.message = `Finalizado: ${job.sent} enviado(s), ${job.failed} falha(s).`;
+    } catch (err: any) {
+      job.status = 'ERROR';
+      job.finishedAt = new Date().toISOString();
+      job.message = err.message || 'Falha no disparo em massa.';
+      job.errors.push(job.message);
+    }
+  })();
+});
+
+app.get('/api/whatsapp/bulk/:id', (req, res) => {
+  const job = bulkJobs.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ success: false, message: 'Disparo em massa nao encontrado.' });
+  }
+  res.json({ success: true, job });
 });
 
 // Webhook endpoint to receive events from Evolution API
@@ -595,11 +900,11 @@ async function runScheduledDispatch(): Promise<void> {
     const db = await readDB();
     const gs = (db as any).globalSettings || {};
     const sd = gs.scheduledDispatch;
-    const evo = gs.evolutionConfig;
-
     if (!sd?.enabled) return;
-    if (!evo?.url || !evo?.instanceName) {
-      console.warn('[Agendador] Evolution API não configurada no banco. Disparo agendado ignorado.');
+    try {
+      getEvolutionConfig(db);
+    } catch {
+      console.warn('[Agendador] Evolution API nao configurada no banco. Disparo agendado ignorado.');
       return;
     }
 
@@ -610,19 +915,24 @@ async function runScheduledDispatch(): Promise<void> {
     const hh = String(brazilNow.getUTCHours()).padStart(2, '0');
     const mm = String(brazilNow.getUTCMinutes()).padStart(2, '0');
     const currentTime = `${hh}:${mm}`;
+    const currentMinutes = Number(hh) * 60 + Number(mm);
     const currentDay = brazilNow.getUTCDay(); // 0=Dom
-
-    // Filtra apenas as regras ativas que correspondem ao horário de disparo atual
-    const rulesToRun = db.regras.filter((r: any) => r.ativo && r.horarioEnvio === currentTime);
-    if (rulesToRun.length === 0) return;
 
     if (!(sd.diasSemana as number[]).includes(currentDay)) return;
 
-    // Evita duplo disparo na mesma janela de 1 minuto
-    if (sd.ultimoDisparo) {
-      const diffSeconds = (nowUtc.getTime() - new Date(sd.ultimoDisparo).getTime()) / 1000;
-      if (diffSeconds < 45) return;
-    }
+    const todayKey = `${brazilNow.getUTCFullYear()}-${String(brazilNow.getUTCMonth() + 1).padStart(2, '0')}-${String(brazilNow.getUTCDate()).padStart(2, '0')}`;
+    const alreadyRun: Record<string, string> = sd.ultimoDisparoPorRegra || {};
+    const toMinutes = (time: string) => {
+      const [hRaw, mRaw] = String(time || '09:00').split(':');
+      return (Number(hRaw) || 0) * 60 + (Number(mRaw) || 0);
+    };
+
+    const rulesToRun = db.regras.filter((r: any) => {
+      if (!r.ativo) return false;
+      const ruleTime = r.horarioEnvio || sd.horario || '09:00';
+      return currentMinutes >= toMinutes(ruleTime) && alreadyRun[r.id] !== todayKey;
+    });
+    if (rulesToRun.length === 0) return;
 
     console.log(`[Agendador] Iniciando disparo agendado às ${currentTime} (horário de Brasília) para ${rulesToRun.length} regra(s)...`);
 
@@ -632,13 +942,11 @@ async function runScheduledDispatch(): Promise<void> {
       brazilNow.getUTCDate()
     );
 
-    const apiKey = (evo.instanceToken || evo.globalToken || '').trim();
-    const apiBase = evo.url.replace(/\/$/, '');
-    const instanceName = evo.instanceName;
-
     let enviadas = 0;
     const erros: string[] = [];
     const dbParcelas: any[] = db.parcelas;
+    const minSec = Number(gs.dispatchMinIntervalSec ?? 15);
+    const maxSec = Number(gs.dispatchMaxIntervalSec ?? 45);
 
     for (const regra of rulesToRun) {
       if (!regra.ativo) continue;
@@ -703,16 +1011,8 @@ async function runScheduledDispatch(): Promise<void> {
         // Envio de WhatsApp
         if (canal === 'WHATSAPP' || canal === 'AMBOS') {
           try {
-            const resp = await fetch(`${apiBase}/message/sendText/${instanceName}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
-              body: JSON.stringify({ number: phone, text: texto, delay: 1200, linkPreview: false })
-            });
-            if (resp.ok) {
-              enviouNesteCiclo = true;
-            } else {
-              erros.push(`${aluno.nome} (WhatsApp): HTTP ${resp.status}`);
-            }
+            await sendEvolutionText(db, phone, texto);
+            enviouNesteCiclo = true;
           } catch (err: any) {
             erros.push(`${aluno.nome} (WhatsApp): ${err.message}`);
           }
@@ -730,8 +1030,9 @@ async function runScheduledDispatch(): Promise<void> {
         }
 
         // Delay anti-ban entre envios
-        await new Promise(r => setTimeout(r, 2500));
+        await new Promise(r => setTimeout(r, randomDelayMs(minSec, maxSec)));
       }
+      alreadyRun[regra.id] = todayKey;
     }
 
     const dataFmt = brazilNow.toLocaleDateString('pt-BR');
@@ -742,7 +1043,8 @@ async function runScheduledDispatch(): Promise<void> {
       scheduledDispatch: {
         ...sd,
         ultimoDisparo: nowUtc.toISOString(),
-        ultimoResultado: resultado
+        ultimoResultado: resultado,
+        ultimoDisparoPorRegra: alreadyRun
       }
     };
     db.parcelas = dbParcelas;

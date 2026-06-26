@@ -12,7 +12,7 @@ import {
   Zap,
   PowerOff
 } from 'lucide-react';
-import { Aluno, WhatsAppMensagem } from '../types';
+import { Aluno, WhatsAppMensagem, GlobalSettings } from '../types';
 import { generateTextWithActiveAI, getAISettings } from '../services/aiService';
 import {
   isEvolutionConfigured,
@@ -30,6 +30,7 @@ interface WhatsAppViewProps {
   onSetWhatsappOnline: (status: boolean) => void;
   onPostAlert: (msg: string, type: 'success' | 'warning' | 'error') => void;
   onSetTab: (tab: string) => void;
+  globalSettings: GlobalSettings;
 }
 
 export default function WhatsAppView({
@@ -39,12 +40,19 @@ export default function WhatsAppView({
   whatsappOnline,
   onSetWhatsappOnline,
   onPostAlert,
-  onSetTab
+  onSetTab,
+  globalSettings
 }: WhatsAppViewProps) {
   const [selectedChatStudentId, setSelectedChatStudentId] = useState<string>(alunos[1]?.id || alunos[0]?.id || '');
   const [textInput, setTextInput] = useState('');
   const [isSimulatingScan, setIsSimulatingScan] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
+  const [bulkText, setBulkText] = useState('Olá, {nome_aluno}. Passando para lembrar sobre suas pendências financeiras no curso {curso}. Caso já tenha regularizado, por favor desconsidere.');
+  const [bulkMinInterval, setBulkMinInterval] = useState(globalSettings?.dispatchMinIntervalSec ?? 15);
+  const [bulkMaxInterval, setBulkMaxInterval] = useState(globalSettings?.dispatchMaxIntervalSec ?? 45);
+  const [bulkJob, setBulkJob] = useState<any>(null);
+  const [bulkStarting, setBulkStarting] = useState(false);
   
   // Choose who to send as: true = Operator (Agent), false = Student (Client)
   const [sendAsAgent, setSendAsAgent] = useState<boolean>(true);
@@ -74,6 +82,11 @@ export default function WhatsAppView({
   // Always derive selectedStudent from the current valid selectedChatStudentId
   const selectedStudent = alunos.find(a => a.id === selectedChatStudentId) || alunos[0];
   const currentChats = mensagens.filter(m => m.alunoId === (selectedStudent?.id ?? selectedChatStudentId));
+
+  useEffect(() => {
+    setBulkMinInterval(globalSettings?.dispatchMinIntervalSec ?? 15);
+    setBulkMaxInterval(globalSettings?.dispatchMaxIntervalSec ?? 45);
+  }, [globalSettings?.dispatchMinIntervalSec, globalSettings?.dispatchMaxIntervalSec]);
 
   const getGeminiApiKey = () => {
     const settings = getAISettings();
@@ -300,6 +313,77 @@ Diretrizes:
     }
   };
 
+  const toggleBulkStudent = (studentId: string) => {
+    setBulkSelectedIds(prev =>
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const selectBulkByStatus = (status: 'TODOS' | 'PENDENTE' | 'INADIMPLENTE') => {
+    const eligible = alunos
+      .filter(aluno => status === 'TODOS' || aluno.statusFinanceiro === status)
+      .filter(aluno => aluno.whatsapp && aluno.whatsapp.trim().length > 5)
+      .filter(aluno => aluno.cobrancaAutomatica !== false)
+      .map(aluno => aluno.id);
+    setBulkSelectedIds(eligible);
+  };
+
+  const pollBulkJob = async (jobId: string) => {
+    const response = await fetch(`/api/whatsapp/bulk/${jobId}`);
+    const data = await response.json();
+    if (response.ok && data.job) {
+      setBulkJob(data.job);
+      if (data.job.status === 'RUNNING') {
+        setTimeout(() => pollBulkJob(jobId), 2500);
+      } else {
+        onPostAlert(data.job.message || 'Disparo em massa concluído.', data.job.failed > 0 ? 'warning' : 'success');
+      }
+    }
+  };
+
+  const handleStartBulk = async () => {
+    if (!bulkText.trim()) {
+      onPostAlert('Escreva a mensagem do disparo em massa.', 'warning');
+      return;
+    }
+    if (bulkSelectedIds.length === 0) {
+      onPostAlert('Selecione pelo menos um aluno para o disparo em massa.', 'warning');
+      return;
+    }
+    if (bulkMinInterval < 5 || bulkMaxInterval < bulkMinInterval) {
+      onPostAlert('Configure um intervalo válido para evitar bloqueios.', 'warning');
+      return;
+    }
+
+    setBulkStarting(true);
+    try {
+      const response = await fetch('/api/whatsapp/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alunoIds: bulkSelectedIds,
+          text: bulkText,
+          minIntervalSec: bulkMinInterval,
+          maxIntervalSec: bulkMaxInterval,
+          respectCobrancaAutomatica: true
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Falha ao iniciar disparo em massa.');
+      }
+      onPostAlert(`Disparo em massa iniciado para ${bulkSelectedIds.length} aluno(s).`, 'success');
+      setBulkJob({ id: data.jobId, status: 'RUNNING', total: bulkSelectedIds.length, sent: 0, failed: 0, message: 'Iniciando...' });
+      pollBulkJob(data.jobId);
+    } catch (err: any) {
+      onPostAlert(err.message || 'Falha ao iniciar disparo em massa.', 'error');
+    } finally {
+      setBulkStarting(false);
+    }
+  };
+
   // Simulated QR Code vector representation
   const qrCodeSvgPath = "M 10 10 L 40 10 L 40 40 L 10 40 Z M 60 10 L 90 10 L 90 40 L 60 40 Z M 10 60 L 40 60 L 40 90 L 10 90 Z M 50 50 L 55 50 L 60 55 L 55 60 Z M 70 70 L 85 70 L 85 85 L 70 85 Z";
 
@@ -309,6 +393,131 @@ Diretrizes:
       <div>
         <h1 className="text-xl font-bold text-gray-900 tracking-tight">Console Evolution API WhatsApp</h1>
         <p className="text-xs text-gray-400">Monitore o sincronismo de canais de entrega, visualize logs de disparos e atue no chat humano</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <Users className="h-4 w-4 text-[#03045e]" />
+              Envio em Massa
+            </h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Envie uma mensagem livre para vários alunos com intervalo aleatório anti-bloqueio.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => selectBulkByStatus('INADIMPLENTE')} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-100 hover:bg-red-100">
+              Inadimplentes
+            </button>
+            <button type="button" onClick={() => selectBulkByStatus('PENDENTE')} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100">
+              Pendentes
+            </button>
+            <button type="button" onClick={() => selectBulkByStatus('TODOS')} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-[#03045e] border border-blue-100 hover:bg-blue-100">
+              Todos aptos
+            </button>
+            <button type="button" onClick={() => setBulkSelectedIds([])} className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100">
+              Limpar
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-2">
+            <textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              rows={4}
+              className="w-full bg-slate-50 border border-gray-200 rounded-lg p-3 text-xs focus:ring-1 focus:ring-[#03045e] focus:bg-white focus:outline-hidden"
+              placeholder="Digite a mensagem em massa. Tokens: {nome_aluno}, {curso}, {valor}, {vencimento}, {parcela}"
+            />
+            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto pr-1">
+              {alunos.map(aluno => {
+                const checked = bulkSelectedIds.includes(aluno.id);
+                const disabled = !aluno.whatsapp || aluno.whatsapp.trim().length <= 5 || aluno.cobrancaAutomatica === false;
+                return (
+                  <button
+                    key={aluno.id}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => toggleBulkStudent(aluno.id)}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition ${
+                      checked
+                        ? 'bg-[#03045e] text-white border-[#03045e]'
+                        : disabled
+                          ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                    title={disabled ? 'Sem WhatsApp válido ou cobrança automática desativada' : aluno.whatsapp}
+                  >
+                    {aluno.nome}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase">
+                Mínimo (s)
+                <input
+                  type="number"
+                  min={5}
+                  value={bulkMinInterval}
+                  onChange={(e) => {
+                    const next = Math.max(5, Number(e.target.value));
+                    setBulkMinInterval(next);
+                    if (bulkMaxInterval < next) setBulkMaxInterval(next + 5);
+                  }}
+                  className="mt-1 w-full bg-white border border-gray-200 rounded-lg p-2 text-xs font-mono"
+                />
+              </label>
+              <label className="text-[10px] font-bold text-gray-500 uppercase">
+                Máximo (s)
+                <input
+                  type="number"
+                  min={bulkMinInterval}
+                  value={bulkMaxInterval}
+                  onChange={(e) => setBulkMaxInterval(Math.max(bulkMinInterval, Number(e.target.value)))}
+                  className="mt-1 w-full bg-white border border-gray-200 rounded-lg p-2 text-xs font-mono"
+                />
+              </label>
+            </div>
+
+            <button
+              type="button"
+              disabled={bulkStarting || bulkJob?.status === 'RUNNING' || bulkSelectedIds.length === 0}
+              onClick={handleStartBulk}
+              className="w-full bg-[#03045e] hover:bg-blue-900 text-white font-bold py-2.5 rounded-lg text-xs transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {bulkStarting || bulkJob?.status === 'RUNNING' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span>{bulkJob?.status === 'RUNNING' ? 'Disparando...' : `Enviar para ${bulkSelectedIds.length}`}</span>
+            </button>
+
+            {bulkJob && (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-gray-600">
+                <div className="flex justify-between font-bold text-gray-800">
+                  <span>{bulkJob.status}</span>
+                  <span>{bulkJob.sent + bulkJob.failed}/{bulkJob.total}</span>
+                </div>
+                <div className="h-2 bg-white rounded-full overflow-hidden mt-2 border border-slate-100">
+                  <div
+                    className="h-full bg-emerald-500 transition-all"
+                    style={{ width: `${bulkJob.total ? Math.round(((bulkJob.sent + bulkJob.failed) / bulkJob.total) * 100) : 0}%` }}
+                  />
+                </div>
+                <p className="mt-2">{bulkJob.message}</p>
+                {bulkJob.current && <p className="text-gray-400">Atual: {bulkJob.current}</p>}
+                {bulkJob.errors?.length > 0 && (
+                  <p className="text-red-600 mt-1 truncate" title={bulkJob.errors.join(' | ')}>
+                    {bulkJob.errors[bulkJob.errors.length - 1]}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Grid: Left stats tracker & connector, Right Interactive Chat window */}

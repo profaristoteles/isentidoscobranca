@@ -25,7 +25,6 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { Aluno, Colaborador, SmtpConfig, GlobalSettings } from '../types';
-import { checkConnectionStatus } from '../services/whatsappService';
 import { safeGetItem, safeSetItem } from '../utils/storage';
 
 
@@ -259,7 +258,20 @@ export default function ConfiguracoesView({
     safeSetItem('sentidos_evolution_instance_token', evolutionInstanceToken.trim());
 
     try {
-      const res = await checkConnectionStatus();
+      const response = await fetch('/api/whatsapp/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: evolutionUrl.trim(),
+          globalToken: evolutionGlobalToken.trim(),
+          instanceName: evolutionInstance.trim(),
+          instanceToken: evolutionInstanceToken.trim()
+        })
+      });
+      const res = await response.json();
+      if (!response.ok && !res.state) {
+        throw new Error(res.message || `HTTP ${response.status}`);
+      }
       if (res.connected) {
         onPostAlert(`Conectado com sucesso à Evolution API! Instância "${evolutionInstance}" está com status ONLINE.`, 'success');
       } else {

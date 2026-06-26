@@ -160,40 +160,23 @@ export async function getQrCode(): Promise<{ qrCode?: string; connected: boolean
 
 // Send Text Message
 export async function sendTextMessage(numberStr: string, text: string): Promise<any> {
-  const settings = getEvolutionSettings();
-  if (!isEvolutionConfigured()) {
-    throw new Error('Evolution API não está configurada.');
-  }
-
   const sanitizedNumber = sanitizePhoneNumber(numberStr);
   if (!sanitizedNumber) {
     throw new Error('Número de telefone inválido ou vazio.');
   }
 
-  const baseUrl = settings.url.replace(/\/$/, '');
-  const activeKey = getActiveApiKey();
-  const endpoint = `${baseUrl}/message/sendText/${settings.instanceName}`;
-
-  const payload = {
-    number: sanitizedNumber,
-    text: text,
-    delay: 1200,
-    linkPreview: true
-  };
-
   try {
-    const response = await fetchWithProxy(endpoint, {
+    const response = await fetch('/api/whatsapp/send-text', {
       method: 'POST',
       headers: {
-        'apikey': activeKey,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ number: sanitizedNumber, text })
     });
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || `Erro HTTP ${response.status}`);
+      throw new Error(data.message || data.error || `Erro HTTP ${response.status}`);
     }
 
     return data;

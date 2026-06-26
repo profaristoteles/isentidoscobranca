@@ -44,15 +44,10 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
         setErrorMsg(data.message || 'Credenciais inválidas.');
       }
     } catch (err) {
-      console.warn('[Sentidos Cobranças] Backend offline para login, realizando validação offline.', err);
+      console.warn('[Sentidos Cobranças] Backend offline para login.', err);
       setIsLoading(false);
       
-      // Offline fallback
-      if (email === 'isentidosedu@gmail.com' && password === 'sentidos123') {
-        onLoginSuccess(email);
-      } else {
-        setErrorMsg('Erro de rede / Servidor offline. Use as credenciais demo: isentidosedu@gmail.com / sentidos123.');
-      }
+      setErrorMsg('Erro de rede ou servidor offline. Inicie o backend para acessar o painel com seguranca.');
     }
   };
 

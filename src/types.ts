@@ -136,6 +136,7 @@ export interface ScheduledDispatch {
   diasSemana: number[];      // 0=Dom, 1=Seg … 6=Sáb
   ultimoDisparo?: string;    // ISO timestamp do último disparo executado
   ultimoResultado?: string;  // descrição do resultado do último disparo
+  ultimoDisparoPorRegra?: Record<string, string>;
 }
 
 export interface EvolutionConfig {
@@ -152,4 +153,3 @@ export interface GlobalSettings {
   scheduledDispatch?: ScheduledDispatch;
   evolutionConfig?: EvolutionConfig;
 }
-
