@@ -1,7 +1,7 @@
 export function installApiAuthFetch() {
   const nativeFetch = window.fetch.bind(window);
 
-  window.fetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+  window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = typeof input === 'string'
       ? input
       : input instanceof URL
@@ -23,6 +23,14 @@ export function installApiAuthFetch() {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
-    return nativeFetch(input, { ...init, headers });
+    const response = await nativeFetch(input, { ...init, headers });
+    if (response.status === 401) {
+      window.localStorage.removeItem('sentidos_auth_token');
+      window.localStorage.removeItem('sentidos_user_email');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.reload();
+      }
+    }
+    return response;
   };
 }

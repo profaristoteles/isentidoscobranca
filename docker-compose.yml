@@ -32,6 +32,7 @@ services:
     restart: always
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-sentidos_user}:${DB_PASSWORD:-siscobra_pass_123}@sentidos_db:5432/${DB_NAME:-sentidos_cobrancas}
+      - AUTH_SECRET=${AUTH_SECRET:-troque-este-segredo-em-producao}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - APP_URL=${APP_URL}
     networks:

@@ -38,6 +38,16 @@ type BulkJob = {
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const sessions = new Map<string, SessionData>();
 const bulkJobs = new Map<string, BulkJob>();
+const AUTH_SECRET = process.env.AUTH_SECRET || process.env.SESSION_SECRET || 'sentidos-cobrancas-local-secret-change-me';
+
+const base64UrlEncode = (value: string): string =>
+  Buffer.from(value, 'utf-8').toString('base64url');
+
+const base64UrlDecode = (value: string): string =>
+  Buffer.from(value, 'base64url').toString('utf-8');
+
+const signTokenPayload = (payload: string): string =>
+  crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
 
 const hashPassword = (password: string): string => {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -60,14 +70,40 @@ const verifyPassword = (password: string, stored?: string): boolean => {
 };
 
 const createSession = (user: any): string => {
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, {
+  const session: SessionData = {
     email: user.email,
     name: user.name,
     role: user.role,
     expiresAt: Date.now() + SESSION_TTL_MS
-  });
+  };
+  const payload = base64UrlEncode(JSON.stringify(session));
+  const signature = signTokenPayload(payload);
+  const token = `${payload}.${signature}`;
+  sessions.set(token, session);
   return token;
+};
+
+const verifySessionToken = (token: string): SessionData | null => {
+  const inMemory = sessions.get(token);
+  if (inMemory && inMemory.expiresAt >= Date.now()) {
+    return inMemory;
+  }
+
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+
+  const expected = signTokenPayload(payload);
+  if (signature.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+
+  try {
+    const parsed = JSON.parse(base64UrlDecode(payload)) as SessionData;
+    if (!parsed.email || !parsed.expiresAt || parsed.expiresAt < Date.now()) return null;
+    sessions.set(token, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
 };
 
 const publicApiPaths = new Set(['/api/login', '/api/status', '/api/whatsapp/webhook']);
@@ -79,12 +115,11 @@ const requireAuth: express.RequestHandler = (req, res, next) => {
   }
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  const session = token ? sessions.get(token) : null;
+  const session = token ? verifySessionToken(token) : null;
   if (!session || session.expiresAt < Date.now()) {
     if (token) sessions.delete(token);
     return res.status(401).json({ success: false, message: 'SessÃ£o invÃ¡lida ou expirada. Faça login novamente.' });
   }
-  session.expiresAt = Date.now() + SESSION_TTL_MS;
   (req as any).user = session;
   next();
 };
