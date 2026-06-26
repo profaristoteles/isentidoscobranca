@@ -749,7 +749,8 @@ export default function App() {
     // Process tags in manual message if present
     let processedText = texto;
     if (targetStudent && texto.includes('{')) {
-      const studentParcelas = parcelas.filter(p => p.alunoId === alunoId);
+      const studentParcelas = parcelas.filter(p => p.alunoId === alunoId)
+        .sort((a, b) => a.numeroParcela - b.numeroParcela);
       // Find first pending or overdue parcela, or fallback to any, or fallback to null
       const targetParcela = studentParcelas.find(p => p.status === 'ATRASADO') || 
                             studentParcelas.find(p => p.status === 'PENDENTE') || 
