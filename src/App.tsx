@@ -73,13 +73,22 @@ const nowIso = () => new Date().toISOString();
 const logTimestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
 // Render a régua/cobrança template using parcela tokens.
-const buildCobrancaText = (template: string, aluno: Aluno, parcela: Parcela) =>
-  template
+// Render a régua/cobrança template using parcela tokens.
+const buildCobrancaText = (template: string, aluno: Aluno, parcela: Parcela) => {
+  const num = String(parcela.numeroParcela).padStart(2, '0');
+  const tot = String(parcela.totalParcelas).padStart(2, '0');
+  return template
     .replace(/{nome_aluno}/g, aluno.nome)
     .replace(/{curso}/g, aluno.curso)
+    .replace(/{valor_boleto}/g, `R$ ${parcela.valorAtual.toFixed(2)}`)
     .replace(/{valor}/g, `R$ ${parcela.valorAtual.toFixed(2)}`)
+    .replace(/{vencimento_boleto}/g, parcela.vencimento)
     .replace(/{vencimento}/g, parcela.vencimento)
-    .replace(/{parcela}/g, formatParcela(parcela));
+    .replace(/{parcela}/g, `${num}/${tot}`)
+    .replace(/{linha_digitavel}/g, (parcela as any).linhaDigitavel || (parcela as any).linha_digitavel || "00190.00009 02738.162006 12345.678901 8 99830000045000")
+    .replace(/{competencia}/g, parcela.competencia || "")
+    .replace(/{link_pdf}/g, (parcela as any).pdfPath || (parcela as any).pdf_path || "http://siscobra.isentidos.net.br/boletos/exemplo.pdf");
+};
 
 export default function App() {
   // Session User State
@@ -737,9 +746,40 @@ export default function App() {
     let apiSuccess = true;
     let apiErrorMsg = '';
 
+    // Process tags in manual message if present
+    let processedText = texto;
+    if (targetStudent && texto.includes('{')) {
+      const studentParcelas = parcelas.filter(p => p.alunoId === alunoId);
+      // Find first pending or overdue parcela, or fallback to any, or fallback to null
+      const targetParcela = studentParcelas.find(p => p.status === 'ATRASADO') || 
+                            studentParcelas.find(p => p.status === 'PENDENTE') || 
+                            studentParcelas[0] || null;
+
+      const num = targetParcela ? String(targetParcela.numeroParcela).padStart(2, '0') : '01';
+      const tot = targetParcela ? String(targetParcela.totalParcelas).padStart(2, '0') : '12';
+      const valorStr = targetParcela ? `R$ ${targetParcela.valorAtual.toFixed(2)}` : `R$ ${(targetStudent.valorMensalidade || 0).toFixed(2)}`;
+      const vencimentoStr = targetParcela ? targetParcela.vencimento : (targetStudent.primeiroVencimentoEmAberto || '10/06/2026');
+      const parcelaStr = targetParcela ? `${num}/${tot}` : '01/12';
+      const competenciaStr = targetParcela ? targetParcela.competencia : '06/2026';
+      const linhaStr = targetParcela ? ((targetParcela as any).linhaDigitavel || (targetParcela as any).linha_digitavel || "00190.00009 02738.162006 12345.678901 8 99830000045000") : "00190.00009 02738.162006 12345.678901 8 99830000045000";
+      const pdfStr = targetParcela ? ((targetParcela as any).pdfPath || (targetParcela as any).pdf_path || "http://siscobra.isentidos.net.br/boletos/exemplo.pdf") : "http://siscobra.isentidos.net.br/boletos/exemplo.pdf";
+
+      processedText = texto
+        .replace(/{nome_aluno}/g, targetStudent.nome)
+        .replace(/{curso}/g, targetStudent.curso)
+        .replace(/{valor_boleto}/g, valorStr)
+        .replace(/{valor}/g, valorStr)
+        .replace(/{vencimento_boleto}/g, vencimentoStr)
+        .replace(/{vencimento}/g, vencimentoStr)
+        .replace(/{parcela}/g, parcelaStr)
+        .replace(/{linha_digitavel}/g, linhaStr)
+        .replace(/{competencia}/g, competenciaStr)
+        .replace(/{link_pdf}/g, pdfStr);
+    }
+
     if (targetStudent && (tipo === 'HUMANO_AGENTE' || tipo === 'SISTEMA') && isEvolutionConfigured()) {
       try {
-        await sendTextMessage(targetStudent.whatsapp, texto);
+        await sendTextMessage(targetStudent.whatsapp, processedText);
       } catch (err: any) {
         apiSuccess = false;
         apiErrorMsg = err.message || err;
@@ -765,7 +805,7 @@ export default function App() {
       id: `msg-${Date.now()}`,
       alunoId,
       tipo,
-      texto,
+      texto: processedText,
       dataHora: nowIso(),
       statusEnvio: 'ENTREGUE'
     };

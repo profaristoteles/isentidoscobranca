@@ -572,9 +572,14 @@ function buildMsgScheduler(template: string, aluno: any, parcela: any): string {
   return template
     .replace(/{nome_aluno}/g, aluno.nome)
     .replace(/{curso}/g, aluno.curso)
+    .replace(/{valor_boleto}/g, `R$ ${Number(parcela.valorAtual).toFixed(2)}`)
     .replace(/{valor}/g, `R$ ${Number(parcela.valorAtual).toFixed(2)}`)
+    .replace(/{vencimento_boleto}/g, parcela.vencimento)
     .replace(/{vencimento}/g, parcela.vencimento)
-    .replace(/{parcela}/g, `${num}/${tot}`);
+    .replace(/{parcela}/g, `${num}/${tot}`)
+    .replace(/{linha_digitavel}/g, parcela.linhaDigitavel || parcela.linha_digitavel || "00190.00009 02738.162006 12345.678901 8 99830000045000")
+    .replace(/{competencia}/g, parcela.competencia || "")
+    .replace(/{link_pdf}/g, parcela.pdfPath || parcela.pdf_path || "http://siscobra.isentidos.net.br/boletos/exemplo.pdf");
 }
 
 function sanitizePhoneScheduler(numStr: string): string {

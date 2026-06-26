@@ -64,7 +64,7 @@ export function getInitialData(): DbData {
       teamPhoneNumber: '',
       dispatchMinIntervalSec: 15,
       dispatchMaxIntervalSec: 45,
-      scheduledDispatch: { enabled: false, horario: '09:00', diasSemana: [1,2,3,4,5] },
+      scheduledDispatch: { enabled: true, horario: '09:00', diasSemana: [1,2,3,4,5] },
       evolutionConfig: { url: '', instanceName: '', instanceToken: '', globalToken: '' }
     }
   };

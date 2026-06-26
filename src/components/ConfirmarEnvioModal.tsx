@@ -47,12 +47,19 @@ export default function ConfirmarEnvioModal({
 
   // Helper to compile template tokens
   const buildText = (template: string, currentAluno: Aluno, currentParcela: Parcela) => {
+    const num = String(currentParcela.numeroParcela).padStart(2, '0');
+    const tot = String(currentParcela.totalParcelas).padStart(2, '0');
     return template
       .replace(/{nome_aluno}/g, currentAluno.nome)
       .replace(/{curso}/g, currentAluno.curso)
+      .replace(/{valor_boleto}/g, `R$ ${currentParcela.valorAtual.toFixed(2)}`)
       .replace(/{valor}/g, `R$ ${currentParcela.valorAtual.toFixed(2)}`)
+      .replace(/{vencimento_boleto}/g, currentParcela.vencimento)
       .replace(/{vencimento}/g, currentParcela.vencimento)
-      .replace(/{parcela}/g, formatParcela(currentParcela));
+      .replace(/{parcela}/g, `${num}/${tot}`)
+      .replace(/{linha_digitavel}/g, (currentParcela as any).linhaDigitavel || (currentParcela as any).linha_digitavel || "00190.00009 02738.162006 12345.678901 8 99830000045000")
+      .replace(/{competencia}/g, currentParcela.competencia || "")
+      .replace(/{link_pdf}/g, (currentParcela as any).pdfPath || (currentParcela as any).pdf_path || "http://siscobra.isentidos.net.br/boletos/exemplo.pdf");
   };
 
   // Update subject and message text when rule or canal changes
