@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GraduationCap, ShieldAlert, ArrowRight, Loader } from 'lucide-react';
+import { GraduationCap, ShieldAlert, ArrowRight, Loader, Mail, KeyRound } from 'lucide-react';
 import { safeSetItem } from '../utils/storage';
 
 
@@ -13,6 +13,10 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +52,39 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
       setIsLoading(false);
       
       setErrorMsg('Erro de rede ou servidor offline. Inicie o backend para acessar o painel com seguranca.');
+    }
+  };
+
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetEmail = (recoveryEmail || email).trim();
+    setRecoveryMessage(null);
+    setErrorMsg(null);
+
+    if (!targetEmail) {
+      setErrorMsg('Informe o e-mail cadastrado para recuperar a senha.');
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      const response = await fetch('/api/password-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.success) {
+        setRecoveryMessage(data.message || 'Se o e-mail estiver cadastrado, enviaremos uma senha provisória.');
+      } else {
+        setErrorMsg(data.message || 'Não foi possível enviar a recuperação de senha.');
+      }
+    } catch (err) {
+      console.warn('[Sentidos CobranÃ§as] Falha ao solicitar recuperaÃ§Ã£o de senha.', err);
+      setErrorMsg('Erro de rede ou servidor offline. Tente novamente em instantes.');
+    } finally {
+      setIsRecovering(false);
     }
   };
 
@@ -87,6 +124,13 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
             <div className="bg-red-950/40 border border-red-500/30 text-red-300 rounded-xl p-3.5 text-xs mb-5 flex items-start gap-2.5 animate-pulse">
               <ShieldAlert className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
               <p className="font-semibold leading-relaxed">{errorMsg}</p>
+            </div>
+          )}
+
+          {recoveryMessage && (
+            <div className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 rounded-xl p-3.5 text-xs mb-5 flex items-start gap-2.5">
+              <Mail className="h-5 w-5 text-emerald-300 shrink-0 mt-0.5" />
+              <p className="font-semibold leading-relaxed">{recoveryMessage}</p>
             </div>
           )}
 
@@ -147,15 +191,62 @@ export default function LoginScreen({ onLoginSuccess, appName }: LoginScreenProp
               </div>
 
               <div className="text-right">
-                <a 
-                  href="#" 
-                  className="font-bold text-[#ff8000] hover:text-orange-400 transition hover:underline" 
-                  onClick={(e) => { e.preventDefault(); alert('Recuperação de login enviada para TI/FAEPI!'); }}
+                <button
+                  type="button"
+                  className="font-bold text-[#ff8000] hover:text-orange-400 transition hover:underline"
+                  onClick={() => {
+                    setShowRecovery((current) => !current);
+                    setRecoveryEmail((current) => current || email);
+                    setRecoveryMessage(null);
+                    setErrorMsg(null);
+                  }}
                 >
                   Esqueceu a senha?
-                </a>
+                </button>
               </div>
             </div>
+
+            {showRecovery && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 space-y-3">
+                <div className="flex items-center gap-2 text-orange-200">
+                  <KeyRound className="h-4 w-4" />
+                  <p className="text-[11px] font-bold uppercase tracking-wider">Recuperar acesso</p>
+                </div>
+                <div>
+                  <label htmlFor="recovery-email" className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                    E-mail cadastrado
+                  </label>
+                  <input
+                    id="recovery-email"
+                    name="recovery-email"
+                    type="email"
+                    autoComplete="email"
+                    value={recoveryEmail || email}
+                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl placeholder-white/35 text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-[#ff8000] focus:border-[#ff8000] focus:bg-white/10 transition duration-300 font-medium font-sans"
+                    placeholder="nome@faepi.edu.br"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRecoverySubmit}
+                  disabled={isRecovering}
+                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-orange-400/30 rounded-xl text-xs font-bold text-orange-100 bg-orange-500/15 hover:bg-orange-500/25 focus:outline-hidden transition disabled:opacity-50"
+                >
+                  {isRecovering ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin" />
+                      <span>Enviando senha provisória...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4" />
+                      <span>Enviar senha provisória</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Submit button */}
             <div className="pt-2">

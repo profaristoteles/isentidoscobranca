@@ -106,7 +106,7 @@ const verifySessionToken = (token: string): SessionData | null => {
   }
 };
 
-const publicApiPaths = new Set(['/api/login', '/api/status', '/api/whatsapp/webhook']);
+const publicApiPaths = new Set(['/api/login', '/api/password-recovery', '/api/status', '/api/whatsapp/webhook']);
 
 const requireAuth: express.RequestHandler = (req, res, next) => {
   const originalPath = req.originalUrl.split('?')[0];
@@ -244,6 +244,84 @@ app.post('/api/login', async (req, res) => {
   } catch (err: any) {
     console.error('Error during login:', err);
     return res.status(500).json({ success: false, message: 'Erro interno ao autenticar usuário.' });
+  }
+});
+
+app.post('/api/password-recovery', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Informe o e-mail cadastrado.' });
+  }
+
+  try {
+    const db = await readDB();
+    const user = db.users?.find((u: any) => String(u.email || '').trim().toLowerCase() === email);
+    const genericMessage = 'Se o e-mail estiver cadastrado, enviaremos uma senha provisória em alguns instantes.';
+
+    if (!user || user.active === false) {
+      return res.json({ success: true, message: genericMessage });
+    }
+
+    const smtpConfig = db.smtpConfig;
+    if (!smtpConfig?.active || !smtpConfig.host || !smtpConfig.user || !smtpConfig.pass || !smtpConfig.fromEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'SMTP não configurado ou inativo. Ative e salve as credenciais em Configurações > Notificações & SMTP.'
+      });
+    }
+
+    const temporaryPassword = `Sentidos-${crypto.randomBytes(4).toString('hex')}`;
+    const oldPassword = user.password;
+    user.password = hashPassword(temporaryPassword);
+    await writeDB(db);
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: Number(smtpConfig.port),
+        secure: smtpConfig.secure ?? false,
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass
+        }
+      });
+
+      await transporter.sendMail({
+        from: `"${smtpConfig.fromName || 'Instituto Sentidos'}" <${smtpConfig.fromEmail}>`,
+        to: user.email,
+        subject: 'Recuperação de senha - Sentidos Cobranças',
+        text: [
+          `Olá, ${user.name || 'usuário'}.`,
+          '',
+          'Recebemos uma solicitação de recuperação de senha para o painel Sentidos Cobranças.',
+          `Sua senha provisória é: ${temporaryPassword}`,
+          '',
+          'Após acessar o sistema, altere sua senha em Configurações > Usuários.',
+          'Se você não solicitou esta recuperação, avise a equipe responsável.'
+        ].join('\n'),
+        html: `
+          <p>Olá, ${user.name || 'usuário'}.</p>
+          <p>Recebemos uma solicitação de recuperação de senha para o painel <strong>Sentidos Cobranças</strong>.</p>
+          <p>Sua senha provisória é: <strong>${temporaryPassword}</strong></p>
+          <p>Após acessar o sistema, altere sua senha em <strong>Configurações &gt; Usuários</strong>.</p>
+          <p>Se você não solicitou esta recuperação, avise a equipe responsável.</p>
+        `
+      });
+
+      return res.json({ success: true, message: genericMessage });
+    } catch (mailErr: any) {
+      console.error('[SMTP] Password recovery email failed:', mailErr);
+      user.password = oldPassword;
+      await writeDB(db);
+      return res.status(500).json({
+        success: false,
+        message: 'Não foi possível enviar o e-mail de recuperação. Verifique as credenciais SMTP.',
+        error: mailErr?.message || 'Erro SMTP desconhecido.'
+      });
+    }
+  } catch (err: any) {
+    console.error('[Auth] Password recovery failed:', err);
+    return res.status(500).json({ success: false, message: 'Erro interno ao processar recuperação de senha.' });
   }
 });
 
