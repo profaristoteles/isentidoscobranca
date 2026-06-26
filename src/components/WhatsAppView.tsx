@@ -15,11 +15,9 @@ import {
 import { Aluno, WhatsAppMensagem, GlobalSettings } from '../types';
 import { generateTextWithActiveAI, getAISettings } from '../services/aiService';
 import {
-  isEvolutionConfigured,
   checkConnectionStatus,
   getQrCode,
-  logoutInstance,
-  getEvolutionSettings
+  logoutInstance
 } from '../services/whatsappService';
 
 interface WhatsAppViewProps {
@@ -62,6 +60,12 @@ export default function WhatsAppView({
 
   const [realQrCode, setRealQrCode] = useState<string>('');
   const [loadingQrCode, setLoadingQrCode] = useState<boolean>(false);
+  const evolutionSettings = globalSettings?.evolutionConfig;
+  const evolutionConfigured = !!(
+    evolutionSettings?.url &&
+    evolutionSettings?.instanceName &&
+    (evolutionSettings?.instanceToken || evolutionSettings?.globalToken)
+  );
 
   // Sync selectedChatStudentId when alunos list changes (e.g., after PostgreSQL data loads,
   // after clear-db or after new students are added). This prevents stale student IDs from
@@ -100,7 +104,7 @@ export default function WhatsAppView({
   };
 
   const checkRealStatus = async () => {
-    if (isEvolutionConfigured()) {
+    if (evolutionConfigured) {
       try {
         const res = await checkConnectionStatus();
         onSetWhatsappOnline(res.connected);
@@ -114,7 +118,7 @@ export default function WhatsAppView({
   };
 
   const fetchRealQr = async () => {
-    if (!isEvolutionConfigured()) return;
+    if (!evolutionConfigured) return;
     setLoadingQrCode(true);
     try {
       const res = await getQrCode();
@@ -139,10 +143,16 @@ export default function WhatsAppView({
     checkRealStatus();
     const interval = setInterval(checkRealStatus, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [
+    evolutionConfigured,
+    evolutionSettings?.url,
+    evolutionSettings?.instanceName,
+    evolutionSettings?.instanceToken,
+    evolutionSettings?.globalToken
+  ]);
 
   const handleSimulateScan = () => {
-    if (isEvolutionConfigured()) {
+    if (evolutionConfigured) {
       fetchRealQr();
       checkRealStatus();
       onPostAlert('Buscando QR Code atualizado da Evolution API...', 'success');
@@ -157,7 +167,7 @@ export default function WhatsAppView({
   };
 
   const handleDisconnect = async () => {
-    if (isEvolutionConfigured()) {
+    if (evolutionConfigured) {
       if (window.confirm("Deseja realmente desconectar o WhatsApp da Evolution API?")) {
         const success = await logoutInstance();
         if (success) {
@@ -541,10 +551,10 @@ Diretrizes:
                   <div>
                     <h4 className="text-xs font-bold text-emerald-800">Celular Emparelhado</h4>
                     <p className="text-[10px] text-emerald-600 mt-0.5">
-                      {isEvolutionConfigured() ? `Instância: ${getEvolutionSettings().instanceName}` : 'Evolution-API Instance v2.3.1'}
+                      {evolutionConfigured ? `Instância: ${evolutionSettings?.instanceName}` : 'Evolution-API Instance v2.3.1'}
                     </p>
                     <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
-                      {isEvolutionConfigured() ? 'Status: ONLINE / PRONTO' : 'Dispositivo: (86) 99820-0012'}
+                      {evolutionConfigured ? 'Status: ONLINE / PRONTO' : 'Dispositivo: (86) 99820-0012'}
                     </p>
                   </div>
                 </div>
@@ -586,7 +596,7 @@ Diretrizes:
 
                 {/* Simulated/Real QR Code box */}
                 <div className="bg-slate-50 border border-gray-200 rounded-xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
-                  {isEvolutionConfigured() ? (
+                  {evolutionConfigured ? (
                     loadingQrCode ? (
                       <div className="h-44 w-44 flex flex-col items-center justify-center text-center gap-2">
                         <RefreshCw className="h-8 w-8 animate-spin text-[#ff8000]" />

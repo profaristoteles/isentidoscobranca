@@ -713,6 +713,79 @@ app.post('/api/whatsapp/send-text', async (req, res) => {
   }
 });
 
+app.get('/api/whatsapp/status', async (_req, res) => {
+  try {
+    const db = await readDB();
+    const { apiBase, instanceName, apiKey } = getEvolutionConfig(db);
+    const response = await fetch(`${apiBase}/instance/connectionState/${encodeURIComponent(instanceName)}`, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, connected: false, state: 'ERROR', details: data, message: data?.message || `HTTP ${response.status}` });
+    }
+    const state = data?.instance?.state || data?.state || 'close';
+    return res.json({ success: true, connected: state === 'open', state, details: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, connected: false, state: 'OFFLINE', message: err.message || 'Falha ao consultar status da Evolution API.' });
+  }
+});
+
+app.get('/api/whatsapp/qr', async (_req, res) => {
+  try {
+    const db = await readDB();
+    const { apiBase, instanceName, apiKey } = getEvolutionConfig(db);
+    const response = await fetch(`${apiBase}/instance/connect/${encodeURIComponent(instanceName)}`, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, connected: false, details: data, message: data?.message || `HTTP ${response.status}` });
+    }
+
+    const qrCode = data?.base64 || data?.code || data?.qrcode?.base64 || data?.qrcode?.code;
+    const connected = data?.instance?.state === 'open' || data?.state === 'open' || data?.message === 'Instance already connected';
+    return res.json({
+      success: true,
+      connected,
+      qrCode,
+      message: data?.message || (qrCode ? 'QR Code gerado.' : 'QR Code não gerado. Verifique os logs da API.'),
+      details: data
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, connected: false, message: err.message || 'Falha ao buscar QR Code da Evolution API.' });
+  }
+});
+
+app.delete('/api/whatsapp/logout', async (_req, res) => {
+  try {
+    const db = await readDB();
+    const { apiBase, instanceName, apiKey } = getEvolutionConfig(db);
+    const response = await fetch(`${apiBase}/instance/logout/${encodeURIComponent(instanceName)}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, details: data, message: data?.message || `HTTP ${response.status}` });
+    }
+    return res.json({ success: true, details: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message || 'Falha ao desconectar Evolution API.' });
+  }
+});
+
 app.post('/api/whatsapp/test-connection', async (req, res) => {
   const { url, instanceName, instanceToken, globalToken } = req.body;
   if (!url || !instanceName) {
