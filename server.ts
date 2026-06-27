@@ -1081,7 +1081,14 @@ function sanitizePhoneScheduler(numStr: string): string {
   return cleaned;
 }
 
+let isDispatchRunning = false;
+
 async function runScheduledDispatch(): Promise<void> {
+  if (isDispatchRunning) {
+    console.log('[Agendador] O disparo agendado anterior ainda está em execução. Ignorando este ciclo para evitar duplicidade.');
+    return;
+  }
+  isDispatchRunning = true;
   try {
     const db = await readDB();
     const gs = (db as any).globalSettings || {};
@@ -1133,6 +1140,7 @@ async function runScheduledDispatch(): Promise<void> {
     const dbParcelas: any[] = db.parcelas;
     const minSec = Number(gs.dispatchMinIntervalSec ?? 15);
     const maxSec = Number(gs.dispatchMaxIntervalSec ?? 45);
+    const updatedParcelIds = new Set<string>();
 
     for (const regra of rulesToRun) {
       if (!regra.ativo) continue;
@@ -1213,6 +1221,7 @@ async function runScheduledDispatch(): Promise<void> {
             ultimoEnvio: nowIso,
             atualizadoEm: nowIso
           };
+          updatedParcelIds.add(dbParcelas[pi].id);
         }
 
         // Delay anti-ban entre envios
@@ -1224,19 +1233,44 @@ async function runScheduledDispatch(): Promise<void> {
     const dataFmt = brazilNow.toLocaleDateString('pt-BR');
     const resultado = `${enviadas} mensagem(ns) enviada(s) em ${dataFmt}${erros.length ? ` | ${erros.length} erro(s): ${erros.slice(0, 3).join('; ')}` : ''}`;
 
-    (db as any).globalSettings = {
-      ...gs,
+    // Re-read database to merge modifications and prevent overwriting concurrent user updates
+    const freshDb = await readDB();
+
+    // 1. Merge updated parcelas
+    for (let pi = 0; pi < dbParcelas.length; pi++) {
+      const p = dbParcelas[pi];
+      if (updatedParcelIds.has(p.id)) {
+        const fIdx = freshDb.parcelas.findIndex((fp: any) => fp.id === p.id);
+        if (fIdx > -1) {
+          freshDb.parcelas[fIdx] = {
+            ...freshDb.parcelas[fIdx],
+            enviadoWhatsAppCount: p.enviadoWhatsAppCount,
+            ultimoEnvio: p.ultimoEnvio,
+            atualizadoEm: p.atualizadoEm
+          };
+        }
+      }
+    }
+
+    // 2. Merge global settings scheduled dispatch stats
+    const freshGs = freshDb.globalSettings || {};
+    const freshSd = freshGs.scheduledDispatch || {};
+    freshDb.globalSettings = {
+      ...freshGs,
       scheduledDispatch: {
-        ...sd,
+        ...freshSd,
         ultimoDisparo: nowUtc.toISOString(),
         ultimoResultado: resultado,
-        ultimoDisparoPorRegra: alreadyRun
+        ultimoDisparoPorRegra: {
+          ...(freshSd.ultimoDisparoPorRegra || {}),
+          ...alreadyRun
+        }
       }
     };
-    db.parcelas = dbParcelas;
 
+    // 3. Add system log
     const logTimestamp = nowUtc.toISOString().replace('T', ' ').substring(0, 19);
-    db.logs.unshift({
+    freshDb.logs.unshift({
       id: `log-${Date.now()}`,
       timestamp: logTimestamp,
       tipo: 'SISTEMA',
@@ -1245,11 +1279,13 @@ async function runScheduledDispatch(): Promise<void> {
       sucesso: erros.length === 0
     } as any);
 
-    await writeDB(db as any);
+    await writeDB(freshDb);
     console.log(`[Agendador] ${resultado}`);
 
   } catch (err: any) {
     console.error('[Agendador] Erro no disparo agendado:', err.message || err);
+  } finally {
+    isDispatchRunning = false;
   }
 }
 
