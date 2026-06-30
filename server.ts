@@ -221,7 +221,10 @@ app.post('/api/login', async (req, res) => {
 
   try {
     const db = await readDB();
-    const matchedUser = db.users?.find((u: any) => u.email === email && verifyPassword(password, u.password));
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const matchedUser = db.users?.find((u: any) => 
+      String(u.email || '').trim().toLowerCase() === normalizedEmail && verifyPassword(password, u.password)
+    );
 
     if (matchedUser) {
       if (matchedUser.active === false) {

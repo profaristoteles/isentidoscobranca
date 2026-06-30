@@ -247,6 +247,11 @@ export default function App() {
   // Initial Fetch from backend DB with LocalStorage fallback
   useEffect(() => {
     const fetchDB = async () => {
+      if (!userEmail) {
+        setIsUsingApi(false);
+        setDbLoaded(true);
+        return;
+      }
       try {
         const response = await fetch('/api/db');
         if (response.ok) {
@@ -280,7 +285,7 @@ export default function App() {
       }
     };
     fetchDB();
-  }, []);
+  }, [userEmail]);
 
   // Auto-fix: gera parcelas MATRICULA faltantes para alunos com registros incompletos no DB
   useEffect(() => {
