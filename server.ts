@@ -154,35 +154,114 @@ function randomDelayMs(minSec: number, maxSec: number): number {
   return Math.floor(Math.random() * ((max - min) * 1000 + 1)) + min * 1000;
 }
 
-function getEvolutionConfig(db: any) {
-  const evo = db.globalSettings?.evolutionConfig || {};
-  const apiKey = String(evo.instanceToken || evo.globalToken || '').trim();
-  const apiBase = String(evo.url || '').replace(/\/$/, '');
-  const instanceName = String(evo.instanceName || '').trim();
+function extractErrorDetail(payload: any): string {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload;
+
+  const responseMsg = payload.response?.message || payload.response?.error;
+  const directMsg = payload.message || payload.error || payload.details;
+
+  let msg = responseMsg || directMsg;
+  if (Array.isArray(msg)) {
+    msg = msg.join('; ');
+  } else if (typeof msg === 'object') {
+    msg = JSON.stringify(msg);
+  } else {
+    msg = String(msg || '');
+  }
+  if (!msg || msg === 'Internal Server Error') {
+    msg = JSON.stringify(payload);
+  }
+  return msg;
+}
+
+function getEvolutionConfig(db: any, bodyConfig?: any) {
+  const evo = (bodyConfig && bodyConfig.url) ? bodyConfig : (db.globalSettings?.evolutionConfig || {});
+  const apiKey = String(evo.instanceToken || evo.globalToken || evo.apiKey || process.env.EVOLUTION_API_KEY || process.env.EVOLUTION_GLOBAL_TOKEN || '').trim();
+  const apiBase = String(evo.url || evo.apiBase || process.env.EVOLUTION_API_URL || '').replace(/\/$/, '');
+  const instanceName = String(evo.instanceName || process.env.EVOLUTION_INSTANCE_NAME || '').trim();
   if (!apiBase || !instanceName || !apiKey) {
-    throw new Error('Evolution API nÃ£o configurada. Informe URL, instÃ¢ncia e token em ConfiguraÃ§Ãµes.');
+    throw new Error('Evolution API não configurada. Informe URL, instância e token em Configurações.');
   }
   return { apiBase, instanceName, apiKey };
 }
 
-async function sendEvolutionText(db: any, numberStr: string, text: string): Promise<any> {
-  const { apiBase, instanceName, apiKey } = getEvolutionConfig(db);
-  const number = sanitizePhoneNumber(numberStr);
-  if (!number) {
-    throw new Error('NÃºmero de WhatsApp invÃ¡lido.');
-  }
+async function sendEvolutionTextSingle(apiBase: string, instanceName: string, apiKey: string, number: string, text: string): Promise<any> {
   const resp = await fetch(`${apiBase}/message/sendText/${encodeURIComponent(instanceName)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
-    body: JSON.stringify({ number, text, delay: 1200, linkPreview: false })
+    body: JSON.stringify({
+      number,
+      text,
+      options: {
+        delay: 1200,
+        presence: 'composing',
+        linkPreview: false
+      }
+    })
   });
   const contentType = resp.headers.get('content-type') || '';
   const payload = contentType.includes('application/json') ? await resp.json().catch(() => ({})) : await resp.text().catch(() => '');
   if (!resp.ok) {
-    const detail = typeof payload === 'string' ? payload : payload?.message || payload?.error || JSON.stringify(payload);
-    throw new Error(`Evolution API HTTP ${resp.status}${detail ? `: ${detail}` : ''}`);
+    if (resp.status === 400 || resp.status === 422) {
+      const resp2 = await fetch(`${apiBase}/message/sendText/${encodeURIComponent(instanceName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+        body: JSON.stringify({ number, text })
+      });
+      const contentType2 = resp2.headers.get('content-type') || '';
+      const payload2 = contentType2.includes('application/json') ? await resp2.json().catch(() => ({})) : await resp2.text().catch(() => '');
+      if (resp2.ok) return payload2;
+    }
+    const detail = extractErrorDetail(payload);
+    throw new Error(`HTTP ${resp.status}${detail ? `: ${detail}` : ''}`);
   }
   return payload;
+}
+
+async function sendEvolutionText(db: any, numberStr: string, text: string, bodyConfig?: any): Promise<any> {
+  const { apiBase, instanceName, apiKey } = getEvolutionConfig(db, bodyConfig);
+  const number = sanitizePhoneNumber(numberStr);
+  if (!number) {
+    throw new Error('Número de WhatsApp inválido.');
+  }
+
+  try {
+    return await sendEvolutionTextSingle(apiBase, instanceName, apiKey, number, text);
+  } catch (err: any) {
+    let altNumber = '';
+    if (number.startsWith('55') && number.length === 13 && number[4] === '9') {
+      altNumber = number.slice(0, 4) + number.slice(5);
+    } else if (number.startsWith('55') && number.length === 12) {
+      altNumber = number.slice(0, 4) + '9' + number.slice(4);
+    }
+
+    if (altNumber) {
+      try {
+        console.log(`[Evolution API] Tentativa com número ${number} falhou (${err.message}). Retestando com número alternativo: ${altNumber}`);
+        return await sendEvolutionTextSingle(apiBase, instanceName, apiKey, altNumber, text);
+      } catch (err2: any) {
+        // Ignora fallback se falhar também
+      }
+    }
+
+    try {
+      const statusResp = await fetch(`${apiBase}/instance/connectionState/${encodeURIComponent(instanceName)}`, {
+        headers: { 'apikey': apiKey, 'Content-Type': 'application/json' }
+      });
+      const statusData = await statusResp.json().catch(() => ({}));
+      const state = statusData?.instance?.state || statusData?.state || 'close';
+      if (state !== 'open') {
+        throw new Error(`Evolution API HTTP 500: A instância "${instanceName}" está DESCONECTADA do WhatsApp (Status: ${state.toUpperCase()}). Por favor, acesse o menu WhatsApp e escaneie o QR Code.`);
+      }
+    } catch (statusErr: any) {
+      if (statusErr.message.includes('DESCONECTADA')) {
+        throw statusErr;
+      }
+    }
+
+    throw new Error(`Evolution API ${err.message}`);
+  }
 }
 
 function findTemplateParcela(db: any, alunoId: string) {
@@ -703,13 +782,13 @@ app.post('/api/whatsapp/proxy', async (req, res) => {
 });
 
 app.post('/api/whatsapp/send-text', async (req, res) => {
-  const { number, text } = req.body;
+  const { number, text, evolutionConfig } = req.body;
   if (!number || !text) {
     return res.status(400).json({ success: false, message: 'Numero e texto sao obrigatorios.' });
   }
   try {
     const db = await readDB();
-    const result = await sendEvolutionText(db, number, text);
+    const result = await sendEvolutionText(db, number, text, evolutionConfig);
     res.json({ success: true, data: result });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message || 'Falha ao enviar WhatsApp.' });

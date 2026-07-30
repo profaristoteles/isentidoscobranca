@@ -79,13 +79,19 @@ export async function sendTextMessage(numberStr: string, text: string): Promise<
     throw new Error('Número de telefone inválido ou vazio.');
   }
 
+  const settings = getEvolutionSettings();
+
   try {
     const response = await fetch('/api/whatsapp/send-text', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ number: sanitizedNumber, text })
+      body: JSON.stringify({
+        number: sanitizedNumber,
+        text,
+        evolutionConfig: settings.url ? settings : undefined
+      })
     });
 
     const data = await response.json().catch(() => ({}));
