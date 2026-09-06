@@ -22,3 +22,4 @@ Este repositório contém o sistema de cobrança automatizada do Instituto Senti
 **Credenciais padrão:**
 * **E-mail:** `isentidosedu@gmail.com`
 * **Senha:** `sentidos123`
+<!-- teste de deploy automático Portainer -->
