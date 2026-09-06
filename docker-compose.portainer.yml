@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: siscobra_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: sentidos_cobrancas
+      POSTGRES_USER: sentidos_user
+      POSTGRES_PASSWORD: ${SISCOBRA_DB_PASSWORD}
+
+    volumes:
+      - siscobra_db_data:/var/lib/postgresql/data
+
+    networks:
+      - siscobra_internal
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U sentidos_user -d sentidos_cobrancas
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    image: ghcr.io/profaristoteles/isentidoscobranca:latest
+    pull_policy: always
+    container_name: siscobra_app
+    restart: unless-stopped
+
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      APP_URL: ${APP_URL}
+      DATABASE_URL: ${DATABASE_URL}
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - siscobra_internal
+      - traefik_network
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_network"
+      - "traefik.http.routers.siscobra.entrypoints=websecure"
+      - "traefik.http.routers.siscobra.rule=Host(`siscobra.isentidos.net.br`)"
+      - "traefik.http.routers.siscobra.tls=true"
+      - "traefik.http.routers.siscobra.tls.certresolver=letsencrypt"
+      - "traefik.http.services.siscobra.loadbalancer.server.port=3001"
+
+networks:
+  siscobra_internal:
+    internal: true
+
+  traefik_network:
+    external: true
+
+volumes:
+  siscobra_db_data:
+    external: true
+    name: siscobra_siscobra_db_data
